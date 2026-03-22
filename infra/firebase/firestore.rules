@@ -1,0 +1,21 @@
+rules_version = '2'; 
+service cloud.firestore { 
+  match /databases/{database}/documents { 
+ 
+    match /incidents/{incidentId} { 
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.guestId; 
+ 
+      allow read: if request.auth != null 
+                  && (request.auth.uid == resource.data.guestId 
+                      || isStaffOfHotel(resource.data.hotelId)); 
+ 
+      allow update: if isStaffOfHotel(resource.data.hotelId); 
+    } 
+ 
+    function isStaffOfHotel(hotelId) { 
+      return request.auth.token.hotelId == hotelId 
+          && request.auth.token.role in ['SECURITY', 'MANAGER', 'FIRST_RESPONDER']; 
+    } 
+  } 
+}

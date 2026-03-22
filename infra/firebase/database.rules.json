@@ -1,0 +1,20 @@
+{ 
+  "rules": { 
+    "live_incidents": { 
+      "$hotelId": { 
+        ".read": "auth != null && auth.token.hotelId == $hotelId", 
+        ".write": false 
+      } 
+    }, 
+    "hotels": { 
+      "$hotelId": { 
+        "staff_online": { 
+          ".read": "auth != null && auth.token.hotelId == $hotelId", 
+          "$uid": { 
+            ".write": "auth != null && auth.uid == $uid"  
+          } 
+        } 
+      } 
+    } 
+  } 
+}
