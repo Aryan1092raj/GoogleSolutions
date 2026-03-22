@@ -1,10 +1,17 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/constants.dart';
 import '../providers/auth_provider.dart';
 
 class GuestCheckinScreen extends ConsumerStatefulWidget {
   const GuestCheckinScreen({super.key});
+
   @override
   ConsumerState createState() {
     return _GuestCheckinScreenState();
@@ -16,6 +23,7 @@ class _GuestCheckinScreenState extends ConsumerState {
   final _roomController = TextEditingController();
   final _nameController = TextEditingController();
   String _language = 'en';
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -25,10 +33,11 @@ class _GuestCheckinScreenState extends ConsumerState {
     super.dispose();
   }
 
-  void _continueToHome() {
+  Future<void> _continueToHome() async {
     final hotelId = _hotelIdController.text.trim();
     final room = _roomController.text.trim();
     final name = _nameController.text.trim();
+
     if (hotelId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hotel ID is required')));
       return;
@@ -41,8 +50,74 @@ class _GuestCheckinScreenState extends ConsumerState {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guest name is required')));
       return;
     }
-    ref.read(guestProfileProvider.notifier).setProfile(GuestProfile(guestName: name, roomNumber: room, language: _language, hotelId: hotelId));
-    context.go('/home');
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      final client = HttpClient();
+      final uri = Uri.parse(AppConstants.backendBaseUrl + '/api/auth/guest-token');
+      final req = await client.postUrl(uri);
+      req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      req.add(utf8.encode(jsonEncode({
+        'hotelId': hotelId,
+        'roomNumber': room,
+        'guestName': name,
+        'language': _language,
+      })));
+
+      final resp = await req.close();
+      final body = await resp.transform(utf8.decoder).join();
+      client.close(force: true);
+
+      if (resp.statusCode != 200) {
+        var message = 'Check-in failed';
+        try {
+          final parsed = jsonDecode(body) as Map<String, dynamic>;
+          if (parsed['error'] != null) {
+            message = parsed['error'].toString();
+          }
+        } catch (_) {}
+        throw Exception(message);
+      }
+
+      final parsed = jsonDecode(body) as Map<String, dynamic>;
+      final customToken = parsed['customToken']?.toString() ?? '';
+      final guestId = parsed['guestId']?.toString() ?? '';
+
+      if (customToken.isEmpty || guestId.isEmpty) {
+        throw Exception('Invalid guest token response');
+      }
+
+      await FirebaseAuth.instance.signInWithCustomToken(customToken);
+
+      ref.read(guestProfileProvider.notifier).setProfile(
+            GuestProfile(
+              guestId: guestId,
+              guestName: name,
+              roomNumber: room,
+              language: _language,
+              hotelId: hotelId,
+            ),
+          );
+
+      if (mounted) {
+        context.go('/home');
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -51,21 +126,36 @@ class _GuestCheckinScreenState extends ConsumerState {
       appBar: AppBar(title: const Text('Guest Check-In')),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: ListView(children: [
-          TextField(controller: _hotelIdController, decoration: const InputDecoration(labelText: 'Hotel ID')),
-          const SizedBox(height: 12),
-          TextField(controller: _roomController, decoration: const InputDecoration(labelText: 'Room Number')),
-          const SizedBox(height: 12),
-          TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Guest Name')),
-          const SizedBox(height: 12),
-          DropdownButtonFormField(
-            value: _language,
-            items: const [DropdownMenuItem(value: 'en', child: Text('English')), DropdownMenuItem(value: 'hi', child: Text('Hindi'))],
-            onChanged: (value) { if (value == null) { return; } setState(() { _language = value.toString(); }); },
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(onPressed: _continueToHome, child: const Text('Continue')),
-        ]),
+        child: ListView(
+          children: [
+            TextField(controller: _hotelIdController, decoration: const InputDecoration(labelText: 'Hotel ID')),
+            const SizedBox(height: 12),
+            TextField(controller: _roomController, decoration: const InputDecoration(labelText: 'Room Number')),
+            const SizedBox(height: 12),
+            TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Guest Name')),
+            const SizedBox(height: 12),
+            DropdownButtonFormField(
+              value: _language,
+              items: const [
+                DropdownMenuItem(value: 'en', child: Text('English')),
+                DropdownMenuItem(value: 'hi', child: Text('Hindi')),
+              ],
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() {
+                  _language = value.toString();
+                });
+              },
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loading ? null : _continueToHome,
+              child: Text(_loading ? 'Checking in...' : 'Continue'),
+            ),
+          ],
+        ),
       ),
     );
   }
