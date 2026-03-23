@@ -50,12 +50,30 @@ class SOSState {
   }
 }
 
-class SOSNotifier extends StateNotifier {
+final webSocketServiceProvider = Provider<WebSocketService>((ref) {
+  final service = WebSocketService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final cameraServiceProvider = Provider<CameraService>((ref) {
+  final service = CameraService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final locationServiceProvider = Provider<LocationService>((ref) {
+  return LocationService();
+});
+
+class SOSNotifier extends StateNotifier<SOSState> {
   final WebSocketService _ws;
   final CameraService _camera;
   final LocationService _location;
   final Ref _ref;
-  StreamSubscription? _sub;
+  StreamSubscription<Map<String, dynamic>>? _sub;
+  Timer? _locationTimer;
+  Timer? _pingTimer;
 
   SOSNotifier(this._ws, this._camera, this._location, this._ref)
       : super(const SOSState(status: SOSStatus.idle, helpOnWay: false)) {
@@ -65,17 +83,17 @@ class SOSNotifier extends StateNotifier {
   Future<void> triggerSOS() async {
     final profile = _ref.read(guestProfileProvider);
     if (profile == null) {
-      state = (state as SOSState).copyWith(status: SOSStatus.error, error: 'Guest profile missing');
+      state = state.copyWith(status: SOSStatus.error, error: 'Guest profile missing');
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      state = (state as SOSState).copyWith(status: SOSStatus.error, error: 'Guest is not authenticated');
+      state = state.copyWith(status: SOSStatus.error, error: 'Guest is not authenticated');
       return;
     }
 
-    state = (state as SOSState).copyWith(status: SOSStatus.initiating, error: null);
+    state = state.copyWith(status: SOSStatus.initiating, error: null);
 
     try {
       await _camera.initialize();
@@ -88,8 +106,8 @@ class SOSNotifier extends StateNotifier {
     double? lng;
     try {
       final pos = await _location.getCurrentPosition();
-      lat = pos.latitude as double?;
-      lng = pos.longitude as double?;
+      lat = pos.latitude;
+      lng = pos.longitude;
     } catch (_) {}
 
     final createReq = {
@@ -153,31 +171,31 @@ class SOSNotifier extends StateNotifier {
         }),
       );
 
-      state = (state as SOSState).copyWith(status: SOSStatus.active, incidentId: incidentId);
+      _startLiveMetadataUpdates(incidentId);
+      state = state.copyWith(status: SOSStatus.active, incidentId: incidentId);
     } catch (error) {
-      state = (state as SOSState).copyWith(status: SOSStatus.error, error: error.toString());
+      state = state.copyWith(status: SOSStatus.error, error: error.toString());
     } finally {
       client.close(force: true);
     }
   }
 
   Future<void> endSOS(String reason) async {
-    final current = state as SOSState;
+    final current = state;
     if (current.incidentId == null) {
       return;
     }
     final id = current.incidentId as String;
     _ws.sendSOSend(id, reason);
+    _locationTimer?.cancel();
+    _pingTimer?.cancel();
     state = current.copyWith(status: SOSStatus.resolving);
   }
 
-  void _handleWsMessage(dynamic msg) {
-    final current = state as SOSState;
-    if (msg is! Map) {
-      return;
-    }
+  void _handleWsMessage(Map<String, dynamic> msg) {
+    final current = state;
     final type = msg['type'];
-    final payload = msg['payload'];
+    final payload = msg['payload'] is Map ? Map<String, dynamic>.from(msg['payload']) : <String, dynamic>{};
 
     if (type == 'AI_STATUS') {
       state = current.copyWith(
@@ -208,10 +226,38 @@ class SOSNotifier extends StateNotifier {
   @override
   void dispose() {
     _sub?.cancel();
+    _locationTimer?.cancel();
+    _pingTimer?.cancel();
     super.dispose();
+  }
+
+  void _startLiveMetadataUpdates(String incidentId) {
+    _locationTimer?.cancel();
+    _locationTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      try {
+        final position = await _location.getCurrentPosition();
+        _ws.sendLocationUpdate(
+          incidentId,
+          lat: position.latitude,
+          lng: position.longitude,
+          accuracyMeters: position.accuracy,
+          floor: 0,
+        );
+      } catch (_) {
+        // GPS may be unavailable indoors, room-based location is still valid.
+      }
+    });
+
+    _pingTimer?.cancel();
+    _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _ws.sendPing();
+    });
   }
 }
 
-final sosProvider = StateNotifierProvider((ref) {
-  return SOSNotifier(WebSocketService(), CameraService(), LocationService(), ref);
+final sosProvider = StateNotifierProvider<SOSNotifier, SOSState>((ref) {
+  final ws = ref.read(webSocketServiceProvider);
+  final camera = ref.read(cameraServiceProvider);
+  final location = ref.read(locationServiceProvider);
+  return SOSNotifier(ws, camera, location, ref);
 });

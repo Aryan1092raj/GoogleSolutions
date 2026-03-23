@@ -5,26 +5,51 @@ import '../widgets/incident_card.dart';
 import '../widgets/live_feed_tile.dart';
 import '../widgets/responder_log.dart';
 
-class CommandCenterScreen extends ConsumerWidget {
+class CommandCenterScreen extends ConsumerStatefulWidget {
   const CommandCenterScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState createState() => _CommandCenterScreenState();
+}
+
+class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
+  String? _selectedIncidentId;
+
+  @override
+  Widget build(BuildContext context) {
     final incidentsAsync = ref.watch(incidentListProvider);
     final profile = ref.watch(staffProfileProvider);
-    final cards = incidentsAsync.value == null ? [] : incidentsAsync.value as List;
-    final selected = cards.isEmpty ? null : cards.first;
+    final cards = incidentsAsync.value ?? <LiveIncidentCard>[];
+    if (cards.isNotEmpty && _selectedIncidentId == null) {
+      _selectedIncidentId = cards.first.incidentId;
+    }
+    final selected = cards.where((c) => c.incidentId == _selectedIncidentId).isNotEmpty
+        ? cards.firstWhere((c) => c.incidentId == _selectedIncidentId)
+        : (cards.isEmpty ? null : cards.first);
     final hotel = profile.hotelId.isEmpty ? 'Unassigned' : profile.hotelId;
+
     return Scaffold(
       appBar: AppBar(title: Text('ResQLink Dashboard  Hotel: ' + hotel + '  Active: ' + cards.length.toString())),
       body: Row(children: [
         SizedBox(
-          width: 320,
+          width: 360,
           child: cards.isEmpty ? const Center(child: Text('No active incidents')) : ListView.builder(
             itemCount: cards.length,
             itemBuilder: (context, index) {
               final card = cards[index];
-              return IncidentCard(title: 'INCIDENT ' + card.incidentId.toString(), severity: card.severity.toString(), room: 'Room ' + card.roomNumber.toString(), floor: 'Floor ' + card.floor.toString());
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedIncidentId = card.incidentId;
+                  });
+                },
+                child: IncidentCard(
+                  title: 'INCIDENT ${card.incidentId}',
+                  severity: card.severity,
+                  room: 'Room ${card.roomNumber}',
+                  floor: 'Floor ${card.floor}',
+                ),
+              );
             },
           ),
         ),

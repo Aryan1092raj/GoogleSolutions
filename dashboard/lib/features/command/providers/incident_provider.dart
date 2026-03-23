@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 class LiveIncidentCard {
@@ -13,11 +14,38 @@ class LiveIncidentCard {
   final String aiSummary;
   final int lastUpdatedMs;
   final bool isStreamLive;
+  final String? acknowledgedBy;
 
-  LiveIncidentCard({required this.incidentId, required this.status, required this.severity, required this.roomNumber, required this.floor, required this.wing, required this.guestName, required this.primaryHazard, required this.aiSummary, required this.lastUpdatedMs, required this.isStreamLive});
+  LiveIncidentCard({
+    required this.incidentId,
+    required this.status,
+    required this.severity,
+    required this.roomNumber,
+    required this.floor,
+    required this.wing,
+    required this.guestName,
+    required this.primaryHazard,
+    required this.aiSummary,
+    required this.lastUpdatedMs,
+    required this.isStreamLive,
+    this.acknowledgedBy,
+  });
 
-  factory LiveIncidentCard.fromJson(Map json) {
-    return LiveIncidentCard(incidentId: json['incidentId'] == null ? '' : json['incidentId'].toString(), status: json['status'] == null ? '' : json['status'].toString(), severity: json['severity'] == null ? 'LOW' : json['severity'].toString(), roomNumber: json['roomNumber'] == null ? '' : json['roomNumber'].toString(), floor: json['floor'] == null ? 0 : int.tryParse(json['floor'].toString()) ?? 0, wing: json['wing'] == null ? '' : json['wing'].toString(), guestName: json['guestName'] == null ? '' : json['guestName'].toString(), primaryHazard: json['primaryHazard'] == null ? 'UNKNOWN' : json['primaryHazard'].toString(), aiSummary: json['aiSummary'] == null ? '' : json['aiSummary'].toString(), lastUpdatedMs: json['lastUpdatedMs'] == null ? 0 : int.tryParse(json['lastUpdatedMs'].toString()) ?? 0, isStreamLive: json['isStreamLive'] == true);
+  factory LiveIncidentCard.fromJson(Map<String, dynamic> json) {
+    return LiveIncidentCard(
+      incidentId: json['incidentId'] == null ? '' : json['incidentId'].toString(),
+      status: json['status'] == null ? '' : json['status'].toString(),
+      severity: json['severity'] == null ? 'LOW' : json['severity'].toString(),
+      roomNumber: json['roomNumber'] == null ? '' : json['roomNumber'].toString(),
+      floor: json['floor'] == null ? 0 : int.tryParse(json['floor'].toString()) ?? 0,
+      wing: json['wing'] == null ? '' : json['wing'].toString(),
+      guestName: json['guestName'] == null ? '' : json['guestName'].toString(),
+      primaryHazard: json['primaryHazard'] == null ? 'UNKNOWN' : json['primaryHazard'].toString(),
+      aiSummary: json['aiSummary'] == null ? '' : json['aiSummary'].toString(),
+      lastUpdatedMs: json['lastUpdatedMs'] == null ? 0 : int.tryParse(json['lastUpdatedMs'].toString()) ?? 0,
+      isStreamLive: json['isStreamLive'] == true,
+      acknowledgedBy: json['acknowledgedBy'] == null ? null : json['acknowledgedBy'].toString(),
+    );
   }
 }
 
@@ -28,21 +56,22 @@ class StaffProfile {
   StaffProfile({required this.uid, required this.hotelId, required this.role});
 }
 
-final staffProfileProvider = StateProvider((ref) {
+final staffProfileProvider = StateProvider<StaffProfile>((ref) {
   return StaffProfile(uid: '', hotelId: '', role: '');
 });
 
-final incidentListProvider = StreamProvider((ref) {
+final incidentListProvider = StreamProvider<List<LiveIncidentCard>>((ref) {
   final profile = ref.watch(staffProfileProvider);
   final hotelId = profile.hotelId;
   if (hotelId.isEmpty) {
-    return const Stream.empty();
+    return const Stream<List<LiveIncidentCard>>.empty();
   }
   return FirebaseDatabase.instance.ref('live_incidents/' + hotelId).onValue.map((event) {
-    final data = event.snapshot.value as Map? ?? {};
-    final cards = [];
+    final raw = event.snapshot.value;
+    final data = raw is Map ? Map<dynamic, dynamic>.from(raw) : <dynamic, dynamic>{};
+    final cards = <LiveIncidentCard>[];
     for (final value in data.values) {
-      final card = LiveIncidentCard.fromJson(Map.from(value));
+      final card = LiveIncidentCard.fromJson(Map<String, dynamic>.from(value as Map));
       if (card.status == 'ACTIVE') { cards.add(card); }
       if (card.status == 'ACKNOWLEDGED') { cards.add(card); }
     }
@@ -50,3 +79,19 @@ final incidentListProvider = StreamProvider((ref) {
     return cards;
   });
 });
+
+Future<void> markStaffOnline(StaffProfile profile, {required String name}) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null || profile.hotelId.isEmpty) {
+    return;
+  }
+
+  await FirebaseDatabase.instance
+      .ref('hotels/${profile.hotelId}/staff_online/${user.uid}')
+      .set({
+    'name': name,
+    'fcmToken': '',
+    'lastSeenMs': DateTime.now().millisecondsSinceEpoch,
+    'isOnDuty': true,
+  });
+}

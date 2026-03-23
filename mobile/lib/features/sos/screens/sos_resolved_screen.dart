@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart'; 
+import 'package:go_router/go_router.dart';
  
 class SOSResolvedScreen extends StatelessWidget { 
   final String incidentId; 
@@ -16,7 +17,7 @@ class SOSResolvedScreen extends StatelessWidget {
             const SizedBox(height: 8), 
             Text('Incident ID: ' + incidentId), 
             const SizedBox(height: 16), 
-            ElevatedButton(onPressed: () { Navigator.of(context).pushReplacementNamed('/home'); }, child: const Text('Return to Home')), 
+            ElevatedButton(onPressed: () { context.go('/home'); }, child: const Text('Return to Home')), 
           ], 
         ), 
       ), 

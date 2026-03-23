@@ -17,7 +17,7 @@ class GuestProfile {
   });
 }
 
-class GuestProfileNotifier extends StateNotifier {
+class GuestProfileNotifier extends StateNotifier<GuestProfile?> {
   GuestProfileNotifier() : super(null);
 
   void setProfile(GuestProfile value) {
@@ -29,10 +29,11 @@ class GuestProfileNotifier extends StateNotifier {
   }
 }
 
-final authStateProvider = StreamProvider((ref) {
+final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges();
 });
 
-final guestProfileProvider = StateNotifierProvider((ref) {
+final guestProfileProvider =
+    StateNotifierProvider<GuestProfileNotifier, GuestProfile?>((ref) {
   return GuestProfileNotifier();
 });

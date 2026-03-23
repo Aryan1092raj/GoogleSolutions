@@ -31,7 +31,11 @@ class _StaffLoginScreenState extends ConsumerState {
       final claims = token == null ? null : token.claims;
       final hotelId = claims == null ? '' : (claims['hotelId'] == null ? '' : claims['hotelId'].toString());
       final role = claims == null ? '' : (claims['role'] == null ? '' : claims['role'].toString());
+      if (hotelId.isEmpty) {
+        throw Exception('Missing hotelId claim on user token. Set custom claims first.');
+      }
       ref.read(staffProfileProvider.notifier).state = StaffProfile(uid: user == null ? '' : user.uid, hotelId: hotelId, role: role);
+      await markStaffOnline(ref.read(staffProfileProvider), name: email);
       if (context.mounted) { context.go('/dashboard'); }
     } catch (error) {
       if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed: ' + error.toString()))); }

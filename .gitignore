@@ -83,3 +83,9 @@ x.hash
 .agent/
 .gemini/
 .gsd/
+
+
+resqlink/
+scripts/
+adapters/
+dashboard/lib/firebase_options.dart

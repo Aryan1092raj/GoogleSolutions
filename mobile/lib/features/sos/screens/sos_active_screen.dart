@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../services/camera_service.dart';
+import '../providers/stream_provider.dart';
 import '../providers/sos_provider.dart';
 
 class SOSActiveScreen extends ConsumerStatefulWidget {
@@ -16,13 +17,23 @@ class SOSActiveScreen extends ConsumerStatefulWidget {
 }
 
 class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen> {
-  final CameraService _camera = CameraService();
+  late final CameraService _camera;
   late final Future<void> _cameraInit;
 
   @override
   void initState() {
     super.initState();
+    _camera = ref.read(cameraServiceProvider);
     _cameraInit = _camera.initialize();
+    Future.microtask(() {
+      ref.read(streamProvider.notifier).startStreaming(widget.incidentId);
+    });
+  }
+
+  @override
+  void dispose() {
+    ref.read(streamProvider.notifier).stopStreaming();
+    super.dispose();
   }
 
   @override
@@ -91,6 +102,7 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen> {
                   },
                 );
                 if (shouldEnd == true) {
+                  ref.read(streamProvider.notifier).stopStreaming();
                   await ref.read(sosProvider.notifier).endSOS('RESOLVED_BY_GUEST');
                   if (context.mounted) {
                     context.go('/sos/resolved/' + widget.incidentId);

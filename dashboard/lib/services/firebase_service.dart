@@ -1,7 +1,10 @@
 import 'package:firebase_core/firebase_core.dart'; 
+import '../firebase_options.dart';
  
 class DashboardFirebaseService { 
-  Future initialize() async { 
-    await Firebase.initializeApp(); 
+  Future<void> initialize() async { 
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ); 
   } 
 } 
