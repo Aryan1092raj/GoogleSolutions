@@ -78,3 +78,8 @@ dashboard/.dart_tool/
 # Misc temp files in this workspace
 tmp*.txt
 x.hash
+
+# Local AI/tooling workspace state
+.agent/
+.gemini/
+.gsd/
