@@ -15,6 +15,23 @@ class GuestProfile {
     required this.language,
     required this.hotelId,
   });
+
+  // Fix #5 — copyWith required by onboarding_screen and SOS language picker
+  GuestProfile copyWith({
+    String? guestId,
+    String? guestName,
+    String? roomNumber,
+    String? language,
+    String? hotelId,
+  }) {
+    return GuestProfile(
+      guestId: guestId ?? this.guestId,
+      guestName: guestName ?? this.guestName,
+      roomNumber: roomNumber ?? this.roomNumber,
+      language: language ?? this.language,
+      hotelId: hotelId ?? this.hotelId,
+    );
+  }
 }
 
 class GuestProfileNotifier extends StateNotifier<GuestProfile?> {
@@ -22,6 +39,24 @@ class GuestProfileNotifier extends StateNotifier<GuestProfile?> {
 
   void setProfile(GuestProfile value) {
     state = value;
+  }
+
+  // Fix #4 — register() called by OnboardingScreen.
+  // guestId/guestName are optional so the 3-arg onboarding call compiles.
+  void register({
+    String guestId = '',
+    String guestName = '',
+    required String hotelId,
+    required String roomNumber,
+    required String language,
+  }) {
+    state = GuestProfile(
+      guestId: guestId,
+      guestName: guestName,
+      hotelId: hotelId,
+      roomNumber: roomNumber,
+      language: language,
+    );
   }
 
   void clear() {
