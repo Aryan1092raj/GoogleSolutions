@@ -12,7 +12,6 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  DefaultFirebaseOptions.validateOrThrow();
   runApp(const ProviderScope(child: DashboardApp()));
 }
 

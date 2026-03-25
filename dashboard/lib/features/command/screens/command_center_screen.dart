@@ -4,6 +4,8 @@ import '../providers/incident_provider.dart';
 import '../widgets/incident_card.dart';
 import '../widgets/live_feed_tile.dart';
 import '../widgets/responder_log.dart';
+import '../widgets/transcript_panel.dart';
+import '../widgets/action_controls.dart';
 
 class CommandCenterScreen extends ConsumerStatefulWidget {
   const CommandCenterScreen({super.key});
@@ -58,9 +60,19 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(children: [
-              Expanded(child: LiveFeedTile(hazard: selected == null ? 'UNKNOWN' : selected.primaryHazard.toString(), summary: selected == null ? '' : selected.aiSummary.toString())),
+              Expanded(flex: 2, child: LiveFeedTile(
+                hazard: selected == null ? 'UNKNOWN' : selected.primaryHazard.toString(),
+                summary: selected == null ? '' : selected.aiSummary.toString(),
+              )),
               const SizedBox(height: 8),
-              Expanded(child: ResponderLog(incidentId: selected == null ? '-' : selected.incidentId.toString())),
+              Expanded(flex: 2, child: TranscriptPanel(
+                incidentId: selected == null ? '-' : selected.incidentId.toString())),
+              const SizedBox(height: 8),
+              ActionControls(
+                incidentId: selected == null ? '-' : selected.incidentId.toString()),
+              const SizedBox(height: 8),
+              Expanded(flex: 1, child: ResponderLog(
+                incidentId: selected == null ? '-' : selected.incidentId.toString())),
             ]),
           ),
         ),

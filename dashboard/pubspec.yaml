@@ -17,6 +17,7 @@ dependencies:
   firebase_database: ^11.0.0 
   fl_chart: ^0.68.0 
   data_table_2: ^2.5.0 
+  video_player: ^2.9.1 
  
 flutter: 
   uses-material-design: true
