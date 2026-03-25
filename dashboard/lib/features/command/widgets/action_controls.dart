@@ -28,7 +28,7 @@ class _ActionControlsState extends ConsumerState<ActionControls> {
         .collection('incidents').doc(widget.incidentId)
         .update({
       'responderLog': FieldValue.arrayUnion([{
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': DateTime.now().toIso8601String(),
         'staffId': profile.uid,
         'staffName': profile.uid,
         'action': action,

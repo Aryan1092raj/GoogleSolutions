@@ -32,6 +32,13 @@ class DashboardApp extends StatelessWidget {
   const DashboardApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(routerConfig: dashboardRouter);
+    return MaterialApp.router(
+      routerConfig: dashboardRouter,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        scaffoldBackgroundColor: Colors.grey[100],
+      ),
+    );
   }
 }

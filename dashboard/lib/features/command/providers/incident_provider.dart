@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class LiveIncidentCard {
   final String incidentId;
@@ -66,7 +67,8 @@ final incidentListProvider = StreamProvider<List<LiveIncidentCard>>((ref) {
   if (hotelId.isEmpty) {
     return const Stream<List<LiveIncidentCard>>.empty();
   }
-  return FirebaseDatabase.instance.ref('live_incidents/' + hotelId).onValue.map((event) {
+  final db = FirebaseDatabase.instanceFor(app: Firebase.app());
+  return db.ref('live_incidents/' + hotelId).onValue.map((event) {
     final raw = event.snapshot.value;
     final data = raw is Map ? Map<dynamic, dynamic>.from(raw) : <dynamic, dynamic>{};
     final cards = <LiveIncidentCard>[];
@@ -86,7 +88,8 @@ Future<void> markStaffOnline(StaffProfile profile, {required String name}) async
     return;
   }
 
-  await FirebaseDatabase.instance
+  final db = FirebaseDatabase.instanceFor(app: Firebase.app());
+  await db
       .ref('hotels/${profile.hotelId}/staff_online/${user.uid}')
       .set({
     'name': name,
