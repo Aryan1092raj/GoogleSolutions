@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/haptic_feedback.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme.dart';
 
 class SOSTriggerButton extends StatefulWidget {
