@@ -23,7 +23,6 @@ class LiveFeedTile extends StatefulWidget {
 class _LiveFeedTileState extends State<LiveFeedTile> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
-  String? _currentUrl;
 
   @override
   void didUpdateWidget(LiveFeedTile oldWidget) {
@@ -43,7 +42,6 @@ class _LiveFeedTileState extends State<LiveFeedTile> {
   Future<void> _initController() async {
     final url = widget.streamUrl;
     if (url == null || url.isEmpty) return;
-    _currentUrl = url;
     final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
     _controller = ctrl;
     try {
@@ -62,7 +60,6 @@ class _LiveFeedTileState extends State<LiveFeedTile> {
     _controller?.dispose();
     _controller = null;
     _isInitialized = false;
-    _currentUrl = null;
   }
 
   @override

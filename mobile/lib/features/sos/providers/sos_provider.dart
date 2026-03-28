@@ -128,7 +128,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
       final uri = Uri.parse(AppConstants.backendBaseUrl + '/api/incidents');
       final req = await client.postUrl(uri);
       req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer ' + idToken);
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${idToken ?? ""}');
       req.add(utf8.encode(jsonEncode(createReq)));
 
       final resp = await req.close();

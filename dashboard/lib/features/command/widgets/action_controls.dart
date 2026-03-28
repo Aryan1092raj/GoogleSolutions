@@ -12,30 +12,70 @@ class ActionControls extends ConsumerStatefulWidget {
 
 class _ActionControlsState extends ConsumerState<ActionControls> {
   final _noteCtrl = TextEditingController();
+  bool _sending = false;
+
+  bool get _hasIncident =>
+      widget.incidentId.isNotEmpty && widget.incidentId != '-';
 
   Future<void> _patchStatus(String status) async {
-    if (widget.incidentId.isEmpty || widget.incidentId == '-') return;
-    await FirebaseFirestore.instance
-        .collection('incidents').doc(widget.incidentId)
-        .update({'status': status});
+    if (!_hasIncident) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('incidents')
+          .doc(widget.incidentId)
+          .update({'status': status});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Status updated to $status')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 
   Future<void> _logAction() async {
     final action = _noteCtrl.text.trim();
-    if (action.isEmpty || widget.incidentId.isEmpty) return;
-    final profile = ref.read(staffProfileProvider);
-    await FirebaseFirestore.instance
-        .collection('incidents').doc(widget.incidentId)
-        .update({
-      'responderLog': FieldValue.arrayUnion([{
-        'timestamp': DateTime.now().toIso8601String(),
-        'staffId': profile.uid,
-        'staffName': profile.uid,
-        'action': action,
-        'type': 'ACTION',
-      }])
-    });
-    _noteCtrl.clear();
+    if (action.isEmpty || !_hasIncident) {
+      if (mounted && action.isNotEmpty && !_hasIncident) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Select an active incident first')));
+      }
+      return;
+    }
+
+    setState(() => _sending = true);
+    try {
+      final profile = ref.read(staffProfileProvider);
+      await FirebaseFirestore.instance
+          .collection('incidents')
+          .doc(widget.incidentId)
+          .update({
+        'responderLog': FieldValue.arrayUnion([
+          {
+            'timestamp': DateTime.now().toIso8601String(),
+            'staffId': profile.uid,
+            'staffName': profile.uid.isNotEmpty ? profile.uid : 'Staff',
+            'action': action,
+            'type': 'ACTION',
+          }
+        ])
+      });
+      _noteCtrl.clear();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Action logged')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to log: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
@@ -49,11 +89,11 @@ class _ActionControlsState extends ConsumerState<ActionControls> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             Expanded(child: FilledButton.tonal(
-              onPressed: () => _patchStatus('ACKNOWLEDGED'),
+              onPressed: _hasIncident ? () => _patchStatus('ACKNOWLEDGED') : null,
               child: const Text('Acknowledge'))),
             const SizedBox(width: 8),
             Expanded(child: FilledButton.tonal(
-              onPressed: () => _patchStatus('RESOLVED'),
+              onPressed: _hasIncident ? () => _patchStatus('RESOLVED') : null,
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.green.shade100,
                 foregroundColor: Colors.green.shade800),
@@ -63,12 +103,22 @@ class _ActionControlsState extends ConsumerState<ActionControls> {
           Row(children: [
             Expanded(child: TextField(
               controller: _noteCtrl,
-              decoration: const InputDecoration(
-                hintText: 'Log an action...', isDense: true,
-                border: OutlineInputBorder()),
+              enabled: _hasIncident,
+              decoration: InputDecoration(
+                hintText: _hasIncident
+                    ? 'Log an action...'
+                    : 'Select an incident first',
+                isDense: true,
+                border: const OutlineInputBorder()),
+              onSubmitted: (_) => _logAction(),
             )),
             const SizedBox(width: 8),
-            IconButton.filled(onPressed: _logAction, icon: const Icon(Icons.send)),
+            _sending
+                ? const SizedBox(width: 40, height: 40,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : IconButton.filled(
+                    onPressed: _hasIncident ? _logAction : null,
+                    icon: const Icon(Icons.send)),
           ]),
         ]),
       ),

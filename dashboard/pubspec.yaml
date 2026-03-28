@@ -18,6 +18,12 @@ dependencies:
   fl_chart: ^0.68.0 
   data_table_2: ^2.5.0 
   video_player: ^2.9.1 
+  google_fonts: ^6.1.0 
  
 flutter: 
   uses-material-design: true
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+  flutter_test:
+    sdk: flutter

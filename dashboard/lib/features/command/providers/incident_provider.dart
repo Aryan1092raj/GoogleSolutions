@@ -68,7 +68,7 @@ final incidentListProvider = StreamProvider<List<LiveIncidentCard>>((ref) {
     return const Stream<List<LiveIncidentCard>>.empty();
   }
   final db = FirebaseDatabase.instanceFor(app: Firebase.app());
-  return db.ref('live_incidents/' + hotelId).onValue.map((event) {
+  return db.ref('live_incidents/$hotelId').onValue.map((event) {
     final raw = event.snapshot.value;
     final data = raw is Map ? Map<dynamic, dynamic>.from(raw) : <dynamic, dynamic>{};
     final cards = <LiveIncidentCard>[];
