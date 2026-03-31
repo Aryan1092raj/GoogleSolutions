@@ -4,10 +4,14 @@ import { hazardSchema, hazardTypeSchema, type Hazard } from './hazard.model';
 const incidentStatusValues = ['ACTIVE', 'ACKNOWLEDGED', 'RESOLVED', 'FALSE_ALARM'] as const; 
 const incidentSeverityValues = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const; 
 const responderLogTypeValues = ['NOTE', 'ACTION', 'SYSTEM'] as const; 
+const aiStatusValues = ['PENDING', 'AVAILABLE', 'UNAVAILABLE', 'DEGRADED'] as const;
+const actionHistoryTypeValues = ['STATUS', 'NOTE', 'AI', 'SYSTEM'] as const;
  
 export type IncidentStatus = (typeof incidentStatusValues)[number]; 
 export type IncidentSeverity = (typeof incidentSeverityValues)[number]; 
 export type ResponderLogType = (typeof responderLogTypeValues)[number]; 
+export type AiStatus = (typeof aiStatusValues)[number];
+export type ActionHistoryType = (typeof actionHistoryTypeValues)[number];
  
 export interface IncidentLocation { 
   floor: number; 
@@ -25,6 +29,15 @@ export interface ResponderLogEntry {
   action: string; 
   type: ResponderLogType; 
 } 
+
+export interface ActionHistoryEntry {
+  timestamp: unknown;
+  actorId: string;
+  actorLabel: string;
+  type: ActionHistoryType;
+  title: string;
+  detail: string;
+}
  
 export interface Incident { 
   incidentId: string; 
@@ -41,6 +54,7 @@ export interface Incident {
   location: IncidentLocation; 
   hazards: Hazard[]; 
   severity: IncidentSeverity; 
+  aiStatus: AiStatus;
   aiSummary: string; 
   translatedTranscript: string; 
   originalTranscript: string; 
@@ -50,6 +64,7 @@ export interface Incident {
   recordingGcsPath?: string; 
   acknowledgedBy?: string; 
   responderLog: ResponderLogEntry[]; 
+  actionHistory: ActionHistoryEntry[];
 }
  
 export interface LiveIncidentCard { 
@@ -61,6 +76,7 @@ export interface LiveIncidentCard {
   wing: string; 
   guestName: string; 
   primaryHazard: string; 
+  aiStatus: AiStatus;
   aiSummary: string; 
   lastUpdatedMs: number; 
   isStreamLive: boolean; 
@@ -81,6 +97,8 @@ export interface StaffOnlineEntry {
 export const incidentStatusSchema = z.enum(incidentStatusValues); 
 export const incidentSeveritySchema = z.enum(incidentSeverityValues); 
 export const responderLogTypeSchema = z.enum(responderLogTypeValues); 
+export const aiStatusSchema = z.enum(aiStatusValues);
+export const actionHistoryTypeSchema = z.enum(actionHistoryTypeValues);
  
 export const incidentLocationSchema = z.object({ 
   floor: z.number(), 
@@ -98,6 +116,15 @@ export const responderLogEntrySchema = z.object({
   action: z.string(), 
   type: responderLogTypeSchema, 
 });
+
+export const actionHistoryEntrySchema = z.object({
+  timestamp: z.unknown(),
+  actorId: z.string(),
+  actorLabel: z.string(),
+  type: actionHistoryTypeSchema,
+  title: z.string(),
+  detail: z.string(),
+});
  
 export const incidentSchema = z.object({ 
   incidentId: z.string(), 
@@ -114,6 +141,7 @@ export const incidentSchema = z.object({
   location: incidentLocationSchema, 
   hazards: z.array(hazardSchema), 
   severity: incidentSeveritySchema, 
+  aiStatus: aiStatusSchema,
   aiSummary: z.string(), 
   translatedTranscript: z.string(), 
   originalTranscript: z.string(), 
@@ -123,6 +151,7 @@ export const incidentSchema = z.object({
   recordingGcsPath: z.string().optional(), 
   acknowledgedBy: z.string().optional(), 
   responderLog: z.array(responderLogEntrySchema), 
+  actionHistory: z.array(actionHistoryEntrySchema),
 }); 
  
 export const liveIncidentCardSchema = z.object({ 
@@ -134,6 +163,7 @@ export const liveIncidentCardSchema = z.object({
   wing: z.string(), 
   guestName: z.string(), 
   primaryHazard: hazardTypeSchema, 
+  aiStatus: aiStatusSchema,
   aiSummary: z.string(), 
   lastUpdatedMs: z.number(), 
   isStreamLive: z.boolean(), 

@@ -9,6 +9,6 @@ class IncidentCard extends StatelessWidget {
  
   @override 
   Widget build(BuildContext context) { 
-    return Card(child: ListTile(title: Text(title), subtitle: Text(severity + ' - ' + room + ' - ' + floor))); 
+    return Card(child: ListTile(title: Text(title), subtitle: Text('$severity - $room - $floor'))); 
   } 
 } 

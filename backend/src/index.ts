@@ -1,6 +1,7 @@
-import 'dotenv/config'; 
-import express from 'express'; 
-import http from 'http'; 
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import http from 'http';
 import { authRouter } from './routes/auth.routes'; 
 import { incidentRouter } from './routes/incident.routes'; 
 import { healthRouter } from './routes/health.routes'; 
@@ -8,8 +9,9 @@ import { getFirebaseApp } from './config/firebase-admin';
 import { createWsServer } from './websocket/ws-server'; 
 import { logger } from './utils/logger'; 
  
-const app = express(); 
-app.use(express.json({ limit: '2mb' })); 
+const app = express();
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '2mb' }));
  
 function isPublicRoute(req) { 
   if (req.path === '/health') { 

@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -56,25 +56,22 @@ class _GuestCheckinScreenState extends ConsumerState {
     });
 
     try {
-      final client = HttpClient();
-      final uri = Uri.parse(AppConstants.backendBaseUrl + '/api/auth/guest-token');
-      final req = await client.postUrl(uri);
-      req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      req.add(utf8.encode(jsonEncode({
-        'hotelId': hotelId,
-        'roomNumber': room,
-        'guestName': name,
-        'language': _language,
-      })));
-
-      final resp = await req.close();
-      final body = await resp.transform(utf8.decoder).join();
-      client.close(force: true);
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/api/auth/guest-token');
+      final resp = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'hotelId': hotelId,
+          'roomNumber': room,
+          'guestName': name,
+          'language': _language,
+        }),
+      );
 
       if (resp.statusCode != 200) {
         var message = 'Check-in failed';
         try {
-          final parsed = jsonDecode(body) as Map<String, dynamic>;
+          final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
           if (parsed['error'] != null) {
             message = parsed['error'].toString();
           }
@@ -82,7 +79,7 @@ class _GuestCheckinScreenState extends ConsumerState {
         throw Exception(message);
       }
 
-      final parsed = jsonDecode(body) as Map<String, dynamic>;
+      final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
       final customToken = parsed['customToken']?.toString() ?? '';
       final guestId = parsed['guestId']?.toString() ?? '';
 
@@ -135,7 +132,7 @@ class _GuestCheckinScreenState extends ConsumerState {
             TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Guest Name')),
             const SizedBox(height: 12),
             DropdownButtonFormField(
-              value: _language,
+              initialValue: _language,
               items: const [
                 DropdownMenuItem(value: 'en', child: Text('English')),
                 DropdownMenuItem(value: 'hi', child: Text('Hindi')),

@@ -59,36 +59,56 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [kBackground, Color(0xFF0A1929)],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Spacer(),
-                _buildSuccessAnimation(),
-                const SizedBox(height: 36),
-                _buildTitle(context),
-                const SizedBox(height: 12),
-                _buildSubtitle(),
-                const SizedBox(height: 40),
-                _buildIncidentCard(),
-                const Spacer(),
-                _buildReturnButton(context),
-                const SizedBox(height: 16),
-              ],
+      body: Stack(
+        children: [
+          // Dark background with green tint
+          Container(color: kBackground),
+          // Green glow instead of blue
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                width: 400,
+                height: 400,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      kSecondary.withValues(alpha: 0.35),
+                      kSecondary.withValues(alpha: 0.2),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                    radius: 0.6,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          // Content
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Spacer(),
+                  _buildSuccessAnimation(),
+                  const SizedBox(height: 36),
+                  _buildTitle(context),
+                  const SizedBox(height: 12),
+                  _buildSubtitle(),
+                  const SizedBox(height: 40),
+                  _buildIncidentCard(),
+                  const Spacer(),
+                  _buildReturnButton(context),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -103,14 +123,14 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: kSecondary.withOpacity(0.15),
+          color: kSecondary.withValues(alpha: 0.12),
           border: Border.all(
             color: kSecondary,
-            width: 3,
+            width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: kSecondary.withOpacity(0.3),
+              color: kSecondary.withValues(alpha: 0.3),
               blurRadius: 30,
               spreadRadius: 5,
             ),
@@ -126,14 +146,14 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
               end: Alignment.bottomRight,
               colors: [
                 kSecondary,
-                kSecondary.withOpacity(0.8),
+                kSecondary.withValues(alpha: 0.8),
               ],
             ),
           ),
           child: const Icon(
             Icons.check_rounded,
             color: Colors.white,
-            size: 60,
+            size: 50,
           ),
         ),
       ),
@@ -146,7 +166,7 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
       child: Text(
         'Emergency Resolved',
         textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+        style: Theme.of(context).textTheme.displayMedium?.copyWith(
               fontSize: 28,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.5,
@@ -173,8 +193,11 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: kSecondary.withOpacity(0.15),
+              color: kSecondary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: kSecondary.withValues(alpha: 0.3),
+              ),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -202,32 +225,18 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
       opacity: _fadeIn,
       child: Container(
         padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: kTextMuted.withOpacity(0.2),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
+        decoration: glassSurfaceDecoration,
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: kPrimary.withOpacity(0.1),
+                color: kSecondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.confirmation_number_outlined,
-                color: kPrimary,
+                color: kSecondary,
                 size: 20,
               ),
             ),
@@ -257,8 +266,11 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: kBackground,
+                color: const Color(0x0DFFFFFF),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0x1AFFFFFF),
+                ),
               ),
               child: Text(
                 widget.incidentId.length > 16
@@ -286,9 +298,15 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: kSecondary.withOpacity(0.3),
+              color: kSecondary.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 8),
+            ),
+            const BoxShadow(
+              color: Color(0x59FFFFFF),
+              blurRadius: 4,
+              offset: Offset(0, 4),
+              spreadRadius: -4,
             ),
           ],
         ),

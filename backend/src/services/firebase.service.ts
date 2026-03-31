@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
  
 const INCIDENTS_COLLECTION = 'incidents'; 
 const LIVE_INCIDENTS_ROOT = 'live_incidents'; 
+const ACTIVE_LIVE_STATUSES = new Set(['ACTIVE', 'ACKNOWLEDGED']);
  
 function nowTs() { 
   return admin.firestore.FieldValue.serverTimestamp(); 
@@ -25,27 +26,35 @@ function getPrimaryHazard(hazards) {
   return hazards[0].type; 
 } 
  
-function buildLiveCard(incident) { 
-  const summary = incident.aiSummary ? incident.aiSummary : ''; 
-  return { 
-    incidentId: incident.incidentId, 
-    status: incident.status, 
-    severity: incident.severity, 
-    roomNumber: incident.roomNumber, 
-    floor: incident.location.floor, 
-    wing: incident.location.wing, 
-    guestName: incident.guestName, 
-    primaryHazard: getPrimaryHazard(incident.hazards), 
-    aiSummary: summary, 
-    lastUpdatedMs: Date.now(), 
-    isStreamLive: Boolean(incident.isStreamLive), 
-    acknowledgedBy: incident.acknowledgedBy ? incident.acknowledgedBy : undefined, 
-  }; 
-} 
+function buildLiveCard(incident) {
+const summary = incident.aiSummary ? incident.aiSummary : '';
+const card: any = {
+incidentId: incident.incidentId,
+status: incident.status,
+severity: incident.severity,
+roomNumber: incident.roomNumber,
+floor: incident.location.floor,
+wing: incident.location.wing,
+guestName: incident.guestName,
+primaryHazard: getPrimaryHazard(incident.hazards),
+aiStatus: incident.aiStatus ? incident.aiStatus : 'PENDING',
+aiSummary: summary,
+lastUpdatedMs: Date.now(),
+isStreamLive: Boolean(incident.isStreamLive),
+};
+if (incident.acknowledgedBy) {
+    card.acknowledgedBy = incident.acknowledgedBy;
+  }
+  return card;
+}
  
 export async function updateLiveCardByIncident(incident) { 
   const rtdb = getRtdb(); 
   const path = LIVE_INCIDENTS_ROOT + '/' + incident.hotelId + '/' + incident.incidentId; 
+  if (!ACTIVE_LIVE_STATUSES.has(incident.status)) {
+    await rtdb.ref(path).remove();
+    return;
+  }
   await rtdb.ref(path).set(buildLiveCard(incident)); 
 } 
  
@@ -80,6 +89,7 @@ export async function createIncident(input) {
     }, 
     hazards: [], 
     severity: 'LOW', 
+    aiStatus: 'PENDING',
     aiSummary: '', 
     translatedTranscript: '', 
     originalTranscript: '', 
@@ -89,6 +99,16 @@ export async function createIncident(input) {
     recordingGcsPath: input.recordingGcsPath, 
     acknowledgedBy: null, 
     responderLog: [], 
+    actionHistory: [
+      {
+        timestamp: new Date().toISOString(),
+        actorId: input.guestId,
+        actorLabel: input.guestName ? input.guestName : 'Guest',
+        type: 'SYSTEM',
+        title: 'SOS started',
+        detail: 'Guest opened a live SOS session.',
+      },
+    ],
   }; 
  
   await ref.set(incident); 
@@ -154,6 +174,7 @@ export async function updateIncidentAnalysis(incidentId, analysis) {
   await ref.update({ 
     hazards: Array.isArray(analysis.hazards) ? analysis.hazards : [], 
     severity: analysis.severity ? analysis.severity : 'LOW', 
+    aiStatus: analysis.aiStatus ? analysis.aiStatus : 'AVAILABLE',
     aiSummary: analysis.aiSummary ? analysis.aiSummary : '', 
     translatedTranscript: analysis.translatedTranscript ? analysis.translatedTranscript : '', 
     originalTranscript: analysis.originalTranscript ? analysis.originalTranscript : '', 
@@ -164,6 +185,7 @@ export async function updateIncidentAnalysis(incidentId, analysis) {
   const merged = Object.assign({}, snapshot.data(), { 
     hazards: Array.isArray(analysis.hazards) ? analysis.hazards : [], 
     severity: analysis.severity ? analysis.severity : 'LOW', 
+    aiStatus: analysis.aiStatus ? analysis.aiStatus : 'AVAILABLE',
     aiSummary: analysis.aiSummary ? analysis.aiSummary : '', 
     translatedTranscript: analysis.translatedTranscript ? analysis.translatedTranscript : '', 
     originalTranscript: analysis.originalTranscript ? analysis.originalTranscript : '', 
@@ -181,12 +203,43 @@ export async function updateLiveCard(incidentId, analysis) {
   const merged = Object.assign({}, incident, { 
     hazards: Array.isArray(analysis.hazards) ? analysis.hazards : incident.hazards, 
     severity: analysis.severity ? analysis.severity : incident.severity, 
+    aiStatus: analysis.aiStatus ? analysis.aiStatus : incident.aiStatus,
     aiSummary: analysis.aiSummary ? analysis.aiSummary : incident.aiSummary, 
   }); 
   await updateLiveCardByIncident(merged); 
 }
  
-export async function updateIncidentStatus(incidentId, status, staffId, note) { 
+export async function updateIncidentAiState(incidentId, aiStatus, aiSummary, detail) {
+  const firestore = getFirestore();
+  const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    return null;
+  }
+
+  const incident = snapshot.data();
+  const updates: any = {
+    aiStatus,
+    updatedAt: nowTs(),
+  };
+  if (typeof aiSummary === 'string') {
+    updates.aiSummary = aiSummary;
+  }
+
+  await ref.update(updates);
+  const nextIncident = Object.assign({}, incident, updates);
+  await updateLiveCardByIncident(nextIncident);
+  await addActionHistory(incidentId, {
+    actorId: 'system',
+    actorLabel: 'System',
+    type: 'AI',
+    title: 'AI status changed',
+    detail: detail ? detail : `AI status is now ${aiStatus}.`,
+  });
+  return nextIncident;
+}
+
+export async function updateIncidentStatus(incidentId, status, staffId, note, staffName) { 
   const firestore = getFirestore(); 
   const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId); 
   const snapshot = await ref.get(); 
@@ -213,11 +266,18 @@ export async function updateIncidentStatus(incidentId, status, staffId, note) {
   await ref.update(updates); 
   const nextIncident = Object.assign({}, incident, updates); 
   await updateLiveCardByIncident(nextIncident); 
+  await addActionHistory(incidentId, {
+    actorId: staffId ? staffId : 'system',
+    actorLabel: staffName ? staffName : 'System',
+    type: 'STATUS',
+    title: 'Status updated',
+    detail: `Incident status changed to ${status}.`,
+  });
  
   if (note) { 
     await addResponderLog(incidentId, { 
       staffId: staffId ? staffId : 'system', 
-      staffName: 'System', 
+      staffName: staffName ? staffName : 'System', 
       action: note, 
       type: 'ACTION', 
     }); 
@@ -229,13 +289,39 @@ export async function updateIncidentStatus(incidentId, status, staffId, note) {
 export async function addResponderLog(incidentId, payload) { 
   const firestore = getFirestore(); 
   const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId); 
+  // Use regular Date string - can't use serverTimestamp() inside arrayUnion
   const entry = { 
-    timestamp: nowTs(), 
+    timestamp: new Date().toISOString(), 
     staffId: payload.staffId, 
     staffName: payload.staffName, 
     action: payload.action, 
     type: payload.type, 
   }; 
   await ref.update({ responderLog: admin.firestore.FieldValue.arrayUnion(entry), updatedAt: nowTs() }); 
+  await addActionHistory(incidentId, {
+    actorId: payload.staffId,
+    actorLabel: payload.staffName,
+    type: payload.type === 'SYSTEM' ? 'SYSTEM' : 'NOTE',
+    title: payload.type === 'SYSTEM' ? 'System note' : 'Responder note',
+    detail: payload.action,
+  });
   return entry; 
+}
+
+export async function addActionHistory(incidentId, payload) {
+  const firestore = getFirestore();
+  const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId);
+  const entry = {
+    timestamp: new Date().toISOString(),
+    actorId: payload.actorId,
+    actorLabel: payload.actorLabel,
+    type: payload.type,
+    title: payload.title,
+    detail: payload.detail,
+  };
+  await ref.update({
+    actionHistory: admin.firestore.FieldValue.arrayUnion(entry),
+    updatedAt: nowTs(),
+  });
+  return entry;
 }

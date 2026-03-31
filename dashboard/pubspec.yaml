@@ -19,9 +19,34 @@ dependencies:
   data_table_2: ^2.5.0 
   video_player: ^2.9.1 
   google_fonts: ^6.1.0 
+  web_socket_channel: ^3.0.0 
+  http: ^1.2.2
  
 flutter: 
   uses-material-design: true
+  assets:
+    - assets/fonts/google_fonts/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/google_fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/google_fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/google_fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/google_fonts/Inter-Bold.ttf
+          weight: 700
+    - family: Fustat
+      fonts:
+        - asset: assets/fonts/google_fonts/Fustat-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/google_fonts/Fustat-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/google_fonts/Fustat-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/google_fonts/Fustat-Bold.ttf
+          weight: 700
 
 dev_dependencies:
   flutter_lints: ^4.0.0

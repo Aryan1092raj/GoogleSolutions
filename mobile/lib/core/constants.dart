@@ -1,12 +1,12 @@
 class AppConstants { 
   static const String backendBaseUrl = String.fromEnvironment( 
     'BACKEND_BASE_URL', 
-    defaultValue: 'https://resqlink-backend-xxxx-uc.a.run.app', 
+    defaultValue: 'http://localhost:8080', 
   ); 
  
   static const String wsUrl = String.fromEnvironment( 
     'WS_URL', 
-    defaultValue: 'wss://resqlink-backend-xxxx-uc.a.run.app/ws', 
+    defaultValue: 'ws://localhost:8080/ws', 
   ); 
  
   static const int videoWidthPx = 640; 

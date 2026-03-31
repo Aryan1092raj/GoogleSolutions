@@ -11,6 +11,11 @@ type BridgeSession = {
 };
 
 const geminiSessions = new Map<string, BridgeSession>();
+const aiFailureRecorded = new Set<string>();
+
+// Buffer for accumulating streaming JSON chunks per incident
+const geminiTextBuffers = new Map<string, string>();
+const MAX_BUFFER_SIZE = 4000;
 
 const analysisSchema = z.object({
   hazards: z.array(
@@ -82,6 +87,40 @@ export function buildSystemPrompt(lang: string): string {
   return `${productionPrompt}\n\nSESSION CONTEXT:\n- Guest declared language (ISO 639-1): ${lang}`;
 }
 
+function buildAiUnavailableSummary(error: unknown): string {
+  const message = String(error ?? '');
+  if (message.includes('BILLING_DISABLED')) {
+    return 'AI analysis unavailable: Vertex AI billing is disabled for this project.';
+  }
+  if (message.includes('PERMISSION_DENIED')) {
+    return 'AI analysis unavailable: backend AI access is not permitted.';
+  }
+  return 'AI analysis unavailable: backend Gemini service is currently failing.';
+}
+
+async function recordAiUnavailable(incidentId: string, error: unknown) {
+  if (aiFailureRecorded.has(incidentId)) {
+    return;
+  }
+
+  aiFailureRecorded.add(incidentId);
+  const summary = buildAiUnavailableSummary(error);
+
+  try {
+    await firebaseService.updateIncidentAiState(
+      incidentId,
+      'UNAVAILABLE',
+      summary,
+      summary,
+    );
+  } catch (updateError) {
+    logger.warn('Failed to persist AI unavailable status', {
+      incidentId,
+      error: String(updateError),
+    });
+  }
+}
+
 function extractTextFromResponse(response: any): string {
   if (!response) {
     return '';
@@ -129,13 +168,63 @@ function coerceJsonText(text: string): string {
     return trimmed;
   }
 
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start >= 0 && end > start) {
-    return trimmed.slice(start, end + 1);
+  // Strip markdown code fences
+  const withoutFences = trimmed
+    .replace(/```json\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  if (withoutFences.startsWith('{') && withoutFences.endsWith('}')) {
+    return withoutFences;
   }
 
-  return trimmed;
+  const start = withoutFences.indexOf('{');
+  const end = withoutFences.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    return withoutFences.slice(start, end + 1);
+  }
+
+  return withoutFences;
+}
+
+/**
+ * Try to parse JSON from potentially incomplete streaming text.
+ * Returns parsed JSON if successful, null if the JSON is incomplete.
+ * Throws if the JSON is malformed and cannot be recovered.
+ */
+function tryParseStreamingJson(text: string): { parsed: any } | { error: string } | null {
+  const cleaned = coerceJsonText(text);
+  if (!cleaned || cleaned.length === 0) {
+    return null;
+  }
+
+  // Must start with { to be valid JSON object
+  if (!cleaned.startsWith('{')) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    return { parsed };
+  } catch (e) {
+    // If it's a syntax error, the JSON might be incomplete
+    // Check if we're missing closing braces/brackets
+    const openBraces = (cleaned.match(/{/g) || []).length;
+    const closeBraces = (cleaned.match(/}/g) || []).length;
+    const openBrackets = (cleaned.match(/\[/g) || []).length;
+    const closeBrackets = (cleaned.match(/]/g) || []).length;
+
+    const missingBraces = openBraces - closeBraces;
+    const missingBrackets = openBrackets - closeBrackets;
+
+    // If we're missing closers, it's likely incomplete - don't error yet
+    if (missingBraces > 0 || missingBrackets > 0) {
+      return null; // Incomplete, keep accumulating
+    }
+
+    // Balanced but invalid JSON = actual error
+    return { error: `JSON parse error: ${String(e)}` };
+  }
 }
 
 async function createGenAiLiveSession(incidentId: string, guestLanguage: string): Promise<BridgeSession> {
@@ -169,6 +258,7 @@ async function createGenAiLiveSession(incidentId: string, guestLanguage: string)
       },
       onerror: (error: any) => {
         logger.error('Gemini Live callback error', { incidentId, error });
+        void recordAiUnavailable(incidentId, error);
       },
       onclose: (event: any) => {
         logger.info('Gemini Live session closed', {
@@ -263,6 +353,12 @@ export async function openGeminiSession(incidentId: string, guestLanguage: strin
 
   const fallback = await createVertexChatFallbackSession(incidentId, guestLanguage);
   geminiSessions.set(incidentId, fallback);
+  await firebaseService.updateIncidentAiState(
+    incidentId,
+    'DEGRADED',
+    'AI is running in fallback mode while live analysis reconnects.',
+    'AI switched to fallback analysis mode.',
+  );
   logger.info('Gemini session opened', { incidentId, mode: fallback.mode });
   return fallback;
 }
@@ -270,6 +366,7 @@ export async function openGeminiSession(incidentId: string, guestLanguage: strin
 export function closeGeminiSession(incidentId: string) {
   const session = geminiSessions.get(incidentId);
   if (!session) {
+    aiFailureRecorded.delete(incidentId);
     return;
   }
   try {
@@ -278,6 +375,7 @@ export function closeGeminiSession(incidentId: string) {
     logger.warn('Gemini session close failed', { incidentId, error });
   } finally {
     geminiSessions.delete(incidentId);
+    aiFailureRecorded.delete(incidentId);
   }
 }
 
@@ -286,7 +384,12 @@ export async function sendMediaToGemini(incidentId: string, chunk: any) {
   if (!session) {
     return;
   }
-  await session.sendMedia(chunk);
+  try {
+    await session.sendMedia(chunk);
+  } catch (error) {
+    logger.error('Gemini media send failed', { incidentId, error });
+    await recordAiUnavailable(incidentId, error);
+  }
 }
 
 export async function parseGeminiResponse(response: any, incidentId: string) {
@@ -296,9 +399,61 @@ export async function parseGeminiResponse(response: any, incidentId: string) {
       return;
     }
 
-    const analysis = analysisSchema.parse(JSON.parse(coerceJsonText(rawText)));
+    // Get or create buffer for this incident
+    const existingBuffer = geminiTextBuffers.get(incidentId) || '';
+    const newBuffer = existingBuffer + rawText;
 
-    await firebaseService.updateIncidentAnalysis(incidentId, analysis);
+    // Check buffer size limit
+    if (newBuffer.length > MAX_BUFFER_SIZE) {
+      logger.warn('Gemini buffer exceeded max size, clearing', {
+        incidentId,
+        bufferSize: newBuffer.length,
+      });
+      geminiTextBuffers.delete(incidentId);
+      return;
+    }
+
+    // Store updated buffer
+    geminiTextBuffers.set(incidentId, newBuffer);
+
+    // Try to parse accumulated JSON
+    const parseResult = tryParseStreamingJson(newBuffer);
+
+    if (!parseResult) {
+      // JSON is incomplete, keep accumulating
+      logger.debug('Gemini JSON incomplete, accumulating', {
+        incidentId,
+        bufferSize: newBuffer.length,
+      });
+      return;
+    }
+
+    if ('error' in parseResult) {
+      logger.error('Gemini JSON parse error', {
+        incidentId,
+        error: parseResult.error,
+      });
+      geminiTextBuffers.delete(incidentId);
+      return;
+    }
+
+    // Successfully parsed!
+    const analysis = analysisSchema.parse(parseResult.parsed);
+    aiFailureRecorded.delete(incidentId);
+
+    // Clear buffer on successful parse
+    geminiTextBuffers.delete(incidentId);
+
+    logger.info('Gemini parse success', {
+      incidentId,
+      severity: analysis.severity,
+      hazards: analysis.hazards.length,
+    });
+
+    await firebaseService.updateIncidentAnalysis(incidentId, {
+      ...analysis,
+      aiStatus: 'AVAILABLE',
+    });
     await firebaseService.updateLiveCard(incidentId, analysis);
 
     if (guestSender) {
@@ -309,6 +464,8 @@ export async function parseGeminiResponse(response: any, incidentId: string) {
           message: analysis.guestCalm,
           severity: analysis.severity,
           helpOnWay: true,
+          hazards: analysis.hazards,
+          aiSummary: analysis.aiSummary,
         },
       });
     }
@@ -318,6 +475,7 @@ export async function parseGeminiResponse(response: any, incidentId: string) {
     }
   } catch (error) {
     logger.error('Gemini parse error', { incidentId, error });
+    await recordAiUnavailable(incidentId, error);
   }
 }
 

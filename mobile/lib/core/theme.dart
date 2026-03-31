@@ -1,16 +1,113 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+// ── Liquid Glass Palette ──────────────────────────────────────────────────────
 const kBackground = Color(0xFF051424);
 const kSurface = Color(0xFF0A1929);
-const kPrimary = Color(0xFFFF3B30);
-const kSecondary = Color(0xFF26A69A);
+const kPrimary = Color(0xFFFF3B30);        // Emergency Red
+const kSecondary = Color(0xFF26A69A);       // Safe Green
+const kBrandBlue = Color(0xFF0084FF);       // Primary Brand
+const kBrandBlueSoft = Color(0x800084FF);   // rgba(0,132,255,0.5)
 const kTextPrimary = Color(0xFFD5E4FA);
 const kTextMuted = Color(0xFF7A9BC2);
+const kGlowBlueLight = Color(0xFF60B1FF);
+const kGlowBlueDeep = Color(0xFF319AFF);
+
+// Glass Surface Recipe
+BoxDecoration glassSurfaceDecoration = BoxDecoration(
+  color: const Color(0x0FFFFFFF), // rgba(255,255,255,0.06)
+  borderRadius: BorderRadius.circular(20),
+  border: Border.all(
+    color: const Color(0x1AFFFFFF), // rgba(255,255,255,0.10)
+    width: 1,
+  ),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.4),
+      blurRadius: 32,
+      offset: const Offset(0, 8),
+    ),
+    const BoxShadow(
+      color: Color(0x14FFFFFF), // rgba(255,255,255,0.08)
+      blurRadius: 4,
+      offset: Offset(0, 4),
+      spreadRadius: -4,
+    ),
+  ],
+);
+
+// Glass surface with backdrop blur simulation (Flutter doesn't support backdrop-filter directly)
+BoxDecoration glassSurfaceBlurredDecoration = BoxDecoration(
+  color: const Color(0xB30A1929), // rgba(10,25,41,0.7)
+  borderRadius: BorderRadius.circular(20),
+  border: Border.all(
+    color: const Color(0x1AFFFFFF),
+    width: 1,
+  ),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.4),
+      blurRadius: 32,
+      offset: const Offset(0, 8),
+    ),
+  ],
+);
+
+// Background Glow Recipe
+Widget buildBackgroundGlow({Alignment alignment = Alignment.topLeft}) {
+  return Positioned.fill(
+    child: Align(
+      alignment: alignment,
+      child: Container(
+        width: 400,
+        height: 400,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              kGlowBlueDeep.withValues(alpha: 0.35),
+              kGlowBlueLight.withValues(alpha: 0.25),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.5, 1.0],
+            radius: 0.6,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// Glass button inner highlight
+BoxDecoration glassButtonDecoration = BoxDecoration(
+  gradient: LinearGradient(
+    colors: [
+      kBrandBlue.withValues(alpha: 0.8),
+      kBrandBlue.withValues(alpha: 0.9),
+    ],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  ),
+  borderRadius: BorderRadius.circular(16),
+  boxShadow: [
+    BoxShadow(
+      color: kBrandBlue.withValues(alpha: 0.3),
+      blurRadius: 20,
+      offset: const Offset(0, 8),
+    ),
+    const BoxShadow(
+      color: Color(0x59FFFFFF), // rgba(255,255,255,0.35)
+      blurRadius: 4,
+      offset: Offset(0, 4),
+      spreadRadius: -4,
+    ),
+  ],
+);
 
 ThemeData buildAppTheme() {
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Inter',
     scaffoldBackgroundColor: kBackground,
     colorScheme: const ColorScheme.dark(
       brightness: Brightness.dark,
@@ -24,44 +121,44 @@ ThemeData buildAppTheme() {
       onError: Colors.white,
     ),
     textTheme: TextTheme(
-      displayLarge: GoogleFonts.manrope(
+      displayLarge: GoogleFonts.fustat(
         color: kTextPrimary,
         fontWeight: FontWeight.w700,
         fontSize: 32,
         letterSpacing: -0.5,
       ),
-      displayMedium: GoogleFonts.manrope(
+      displayMedium: GoogleFonts.fustat(
         color: kTextPrimary,
         fontWeight: FontWeight.w700,
         fontSize: 28,
         letterSpacing: -0.5,
       ),
-      displaySmall: GoogleFonts.manrope(
+      displaySmall: GoogleFonts.fustat(
         color: kTextPrimary,
         fontWeight: FontWeight.w600,
         fontSize: 24,
       ),
-      headlineMedium: GoogleFonts.manrope(
+      headlineMedium: GoogleFonts.fustat(
         color: kTextPrimary,
         fontWeight: FontWeight.w600,
         fontSize: 20,
       ),
-      headlineSmall: GoogleFonts.manrope(
+      headlineSmall: GoogleFonts.fustat(
         color: kTextPrimary,
         fontWeight: FontWeight.w600,
         fontSize: 18,
       ),
-      titleLarge: GoogleFonts.manrope(
+      titleLarge: GoogleFonts.inter(
         color: kTextPrimary,
         fontWeight: FontWeight.w600,
         fontSize: 16,
       ),
-      titleMedium: GoogleFonts.manrope(
+      titleMedium: GoogleFonts.inter(
         color: kTextPrimary,
         fontWeight: FontWeight.w500,
         fontSize: 14,
       ),
-      titleSmall: GoogleFonts.manrope(
+      titleSmall: GoogleFonts.inter(
         color: kTextPrimary,
         fontWeight: FontWeight.w500,
         fontSize: 13,
@@ -98,38 +195,42 @@ ThemeData buildAppTheme() {
       ),
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: kSurface.withOpacity(0.95),
+      backgroundColor: Colors.transparent,
       foregroundColor: kTextPrimary,
       elevation: 0,
       centerTitle: true,
-      titleTextStyle: GoogleFonts.manrope(
+      titleTextStyle: GoogleFonts.fustat(
         color: kTextPrimary,
         fontSize: 18,
         fontWeight: FontWeight.w600,
       ),
+      iconTheme: const IconThemeData(
+        color: kTextPrimary,
+        size: 24,
+      ),
     ),
     cardTheme: CardThemeData(
-      color: kSurface,
+      color: const Color(0x0FFFFFFF),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: kTextMuted.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(
+          color: Color(0x1AFFFFFF),
           width: 1,
         ),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: kPrimary,
+        backgroundColor: kBrandBlue.withValues(alpha: 0.8),
         foregroundColor: Colors.white,
         elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
         ),
         textStyle: GoogleFonts.inter(
-          fontSize: 15,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -137,12 +238,12 @@ ThemeData buildAppTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: kTextPrimary,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
         ),
-        side: BorderSide(
-          color: kTextMuted.withOpacity(0.3),
+        side: const BorderSide(
+          color: Color(0x4DFFFFFF),
           width: 1,
         ),
         textStyle: GoogleFonts.inter(
@@ -163,7 +264,7 @@ ThemeData buildAppTheme() {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: kSurface,
+      fillColor: const Color(0x0FFFFFFF),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -171,8 +272,8 @@ ThemeData buildAppTheme() {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(
-          color: kTextMuted.withOpacity(0.2),
+        borderSide: const BorderSide(
+          color: Color(0x33FFFFFF),
           width: 1,
         ),
       ),
@@ -180,7 +281,7 @@ ThemeData buildAppTheme() {
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(
           color: kSecondary,
-          width: 2,
+          width: 1.5,
         ),
       ),
       errorBorder: OutlineInputBorder(
@@ -202,13 +303,14 @@ ThemeData buildAppTheme() {
         fontSize: 14,
       ),
       hintStyle: GoogleFonts.inter(
-        color: kTextMuted.withOpacity(0.5),
+        color: kTextMuted.withValues(alpha: 0.5),
         fontSize: 14,
       ),
       errorStyle: GoogleFonts.inter(
         color: kPrimary,
         fontSize: 12,
       ),
+      prefixIconColor: kTextMuted,
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: kSurface,
@@ -226,7 +328,7 @@ ThemeData buildAppTheme() {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
-      titleTextStyle: GoogleFonts.manrope(
+      titleTextStyle: GoogleFonts.fustat(
         color: kTextPrimary,
         fontSize: 20,
         fontWeight: FontWeight.w600,
@@ -242,8 +344,8 @@ ThemeData buildAppTheme() {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
     ),
-    dividerTheme: DividerThemeData(
-      color: kTextMuted.withOpacity(0.15),
+    dividerTheme: const DividerThemeData(
+      color: Color(0x26FFFFFF),
       thickness: 1,
     ),
     iconTheme: const IconThemeData(
@@ -254,6 +356,21 @@ ThemeData buildAppTheme() {
       color: kPrimary,
       linearTrackColor: kSurface,
       circularTrackColor: kSurface,
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: const Color(0x0FFFFFFF),
+      labelStyle: GoogleFonts.inter(
+        color: kTextPrimary,
+        fontSize: 12,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(
+          color: Color(0x1AFFFFFF),
+          width: 1,
+        ),
+      ),
     ),
   );
 }

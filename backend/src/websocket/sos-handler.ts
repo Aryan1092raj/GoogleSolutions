@@ -2,11 +2,12 @@ import { guestToBackendMessageSchema } from '../models/ws-message.model';
 import * as firebaseService from '../services/firebase.service'; 
 import * as fcmService from '../services/fcm.service'; 
 import * as storageService from '../services/storage.service'; 
+import { getRtdb } from '../config/firebase-admin';
 import { logger } from '../utils/logger'; 
 import { closeGeminiSession, openGeminiSession, sendMediaToGemini } from './gemini-bridge'; 
 import { sendToGuest } from './ws-server'; 
  
-const maxChunkBytes = Number(process.env.MAX_MEDIA_CHUNK_BYTES ? process.env.MAX_MEDIA_CHUNK_BYTES : '65536'); 
+const maxChunkBytes = Number(process.env.MAX_MEDIA_CHUNK_BYTES ? process.env.MAX_MEDIA_CHUNK_BYTES : '524288'); 
  
 function sendWsError(incidentId, code, message, retryable) { 
   sendToGuest(incidentId, { 
@@ -25,6 +26,21 @@ function isChunkTooLarge(base64Data) {
   } 
   return false; 
 } 
+
+async function relayFrameToRtdb(incidentId: string, videoBase64: string) {
+  try {
+    const rtdb = getRtdb();
+    await rtdb.ref('live_frames/' + incidentId).set({
+      frame: videoBase64,
+      updatedMs: Date.now(),
+    });
+  } catch (error) {
+    logger.warn('Failed to relay live frame to RTDB', {
+      incidentId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
  
 export async function handleSosMessage(ws, rawMessage, incidentIdFromConnection) { 
   let parsed; 
@@ -94,6 +110,11 @@ export async function handleSosMessage(ws, rawMessage, incidentIdFromConnection)
  
     await sendMediaToGemini(msg.payload.incidentId, msg.payload); 
     await storageService.appendMediaChunk(msg.payload.incidentId, msg.payload.chunkIndex, msg.payload.video, msg.payload.audio); 
+
+    // Relay latest frame to RTDB so dashboard can display it
+    if (msg.payload.video && msg.payload.chunkIndex % 6 === 0) {
+      await relayFrameToRtdb(msg.payload.incidentId, msg.payload.video);
+    }
     return; 
   }
  
@@ -110,7 +131,13 @@ export async function handleSosMessage(ws, rawMessage, incidentIdFromConnection)
       finalStatus = 'FALSE_ALARM'; 
     } 
  
-    await firebaseService.updateIncidentStatus(msg.payload.incidentId, finalStatus, null, 'Guest ended SOS'); 
+    await firebaseService.updateIncidentStatus(
+      msg.payload.incidentId,
+      finalStatus,
+      null,
+      'Guest ended SOS',
+      'Guest',
+    ); 
     const gcsPath = await storageService.finalizeRecording(msg.payload.incidentId); 
  
     if (gcsPath) { 

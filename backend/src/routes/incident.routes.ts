@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod'; 
 import * as firebaseService from '../services/firebase.service'; 
 import { issueWsToken } from '../websocket/ws-server'; 
+import { sendToGuest } from '../websocket/ws-server';
 import { isGeminiConfigured } from '../services/gemini.service'; 
  
 const createIncidentSchema = z.object({ 
@@ -113,16 +114,47 @@ incidentRouter.patch('/:incidentId/status', async function (req, res) {
  
   const requester = getRequester(req); 
   let staffId = null; 
+  let staffName = 'Staff';
   if (requester) { 
     if (requester.uid) { 
       staffId = requester.uid; 
     } 
+    if (requester.email) {
+      staffName = String(requester.email);
+    } else if (requester.name) {
+      staffName = String(requester.name);
+    }
   } 
-  const updated = await firebaseService.updateIncidentStatus(req.params.incidentId, parsed.data.status, staffId, parsed.data.note); 
+  const updated = await firebaseService.updateIncidentStatus(req.params.incidentId, parsed.data.status, staffId, parsed.data.note, staffName); 
   if (!updated) { 
     res.status(404).json({ error: 'Not found' }); 
     return; 
   } 
+
+  if (parsed.data.status === 'ACKNOWLEDGED') {
+    sendToGuest(req.params.incidentId, {
+      type: 'AI_STATUS',
+      payload: {
+        incidentId: req.params.incidentId,
+        message: 'Security has acknowledged your SOS. Stay calm and keep this feed active.',
+        severity: updated.severity || 'LOW',
+        helpOnWay: true,
+      },
+    });
+  }
+
+  if (parsed.data.status === 'RESOLVED' || parsed.data.status === 'FALSE_ALARM') {
+    sendToGuest(req.params.incidentId, {
+      type: 'INCIDENT_RESOLVED',
+      payload: {
+        incidentId: req.params.incidentId,
+        resolvedBy: 'staff',
+        message: parsed.data.status === 'FALSE_ALARM'
+            ? 'Security closed this incident as a false alarm.'
+            : 'Security marked this incident as resolved.',
+      },
+    });
+  }
  
   res.status(200).json({ 
     incidentId: req.params.incidentId, 
@@ -140,14 +172,20 @@ incidentRouter.post('/:incidentId/log', async function (req, res) {
  
   const requester = getRequester(req); 
   let staffId = 'system'; 
+  let staffName = 'Staff';
   if (requester) { 
     if (requester.uid) { 
       staffId = requester.uid; 
     } 
+    if (requester.email) {
+      staffName = String(requester.email);
+    } else if (requester.name) {
+      staffName = String(requester.name);
+    }
   } 
   const entry = await firebaseService.addResponderLog(req.params.incidentId, { 
     staffId: staffId, 
-    staffName: 'Staff', 
+    staffName: staffName, 
     action: parsed.data.action, 
     type: parsed.data.type, 
   }); 

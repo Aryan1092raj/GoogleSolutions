@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/theme.dart';
+import '../../../core/constants.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/widgets/language_picker.dart';
 
@@ -50,25 +55,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      hintStyle: TextStyle(color: kTextMuted.withOpacity(0.5)),
+      hintStyle: TextStyle(color: kTextMuted.withValues(alpha: 0.5)),
       labelStyle: const TextStyle(color: kTextMuted),
       prefixIcon: Icon(icon, color: kTextMuted, size: 20),
       filled: true,
-      fillColor: kSurface,
+      fillColor: const Color(0x0FFFFFFF),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(
-          color: kTextMuted.withOpacity(0.2),
+        borderSide: const BorderSide(
+          color: Color(0x33FFFFFF),
           width: 1,
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kSecondary, width: 2),
+        borderSide: const BorderSide(color: kSecondary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -85,13 +90,59 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final hotelId = _hotelIdCtrl.text.trim();
+    final room = _roomCtrl.text.trim();
+    const name = 'Guest';
+
     setState(() => _loading = true);
+
     try {
-      ref.read(guestProfileProvider.notifier).register(
-            hotelId: _hotelIdCtrl.text.trim(),
-            roomNumber: _roomCtrl.text.trim(),
-            language: _selectedLang,
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/api/auth/guest-token');
+      final resp = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'hotelId': hotelId,
+          'roomNumber': room,
+          'guestName': name,
+          'language': _selectedLang,
+        }),
+      );
+
+      final body = resp.body;
+
+      if (resp.statusCode != 200) {
+        var message = 'Check-in failed';
+        try {
+          final parsed = jsonDecode(body) as Map<String, dynamic>;
+          if (parsed['error'] != null) {
+            message = parsed['error'].toString();
+          }
+        } catch (_) {}
+        throw Exception(message);
+      }
+
+      final parsed = jsonDecode(body) as Map<String, dynamic>;
+      final customToken = parsed['customToken']?.toString() ?? '';
+      final guestId = parsed['guestId']?.toString() ?? '';
+
+      if (customToken.isEmpty || guestId.isEmpty) {
+        throw Exception('Invalid guest token response');
+      }
+
+      await FirebaseAuth.instance.signInWithCustomToken(customToken);
+
+      ref.read(guestProfileProvider.notifier).setProfile(
+            GuestProfile(
+              guestId: guestId,
+              guestName: name,
+              roomNumber: room,
+              language: _selectedLang,
+              hotelId: hotelId,
+            ),
           );
+
       if (mounted) {
         context.go('/home');
       }
@@ -123,37 +174,37 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [kBackground, Color(0xFF0A1929)],
-          ),
-        ),
-        child: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 48),
-                    _buildForm(),
-                    const SizedBox(height: 40),
-                    _buildCTA(),
-                    const SizedBox(height: 24),
-                    _buildFooter(),
-                  ],
+      body: Stack(
+        children: [
+          // Dark background
+          Container(color: kBackground),
+          // Background glow in top-left
+          buildBackgroundGlow(alignment: Alignment.topLeft),
+          // Content
+          SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 48),
+                      _buildForm(),
+                      const SizedBox(height: 40),
+                      _buildCTA(),
+                      const SizedBox(height: 24),
+                      _buildFooter(),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -161,9 +212,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   Widget _buildHeader() {
     return Column(
       children: [
+        // Shield logo with gradient
         Container(
-          width: 80,
-          height: 80,
+          width: 72,
+          height: 72,
           margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -174,8 +226,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: kPrimary.withOpacity(0.4),
-                blurRadius: 20,
+                color: kPrimary.withValues(alpha: 0.4),
+                blurRadius: 40,
                 offset: const Offset(0, 8),
               ),
             ],
@@ -183,34 +235,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
           child: const Icon(
             Icons.shield,
             color: Colors.white,
-            size: 40,
+            size: 36,
           ),
         ),
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 600),
-          builder: (context, value, child) {
-            return Opacity(
-              opacity: value,
-              child: Transform.translate(
-                offset: Offset(0, 10 * (1 - value)),
-                child: child,
+        // ResQLink headline
+        Text(
+          'ResQLink',
+          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
               ),
-            );
-          },
-          child: Text(
-            'ResQLink',
-            style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.5,
-                ),
-          ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        // Subline
+        Text(
           'Your emergency safety companion',
-          style: TextStyle(color: kTextMuted, fontSize: 15),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontSize: 14,
+              ),
         ),
       ],
     );
@@ -219,37 +262,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   Widget _buildForm() {
     return Column(
       children: [
+        // Hotel Code & Room Number Card
         Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: kSurface.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: kTextMuted.withOpacity(0.1),
-            ),
-          ),
+          padding: const EdgeInsets.all(20),
+          decoration: glassSurfaceDecoration,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Check In',
-                style: TextStyle(
-                  color: kTextPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: kTextPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Enter your hotel details to get started',
-                style: TextStyle(color: kTextMuted, fontSize: 13),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 20),
               TextFormField(
                 controller: _hotelIdCtrl,
                 style: const TextStyle(color: kTextPrimary),
-                decoration:
-                    _field('Hotel or Venue Code', Icons.hotel_outlined),
+                decoration: _field('Hotel or Venue Code', Icons.hotel_outlined),
                 textInputAction: TextInputAction.next,
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Please enter hotel code' : null,
@@ -258,8 +295,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               TextFormField(
                 controller: _roomCtrl,
                 style: const TextStyle(color: kTextPrimary),
-                decoration:
-                    _field('Room / Unit Number', Icons.meeting_room_outlined),
+                decoration: _field('Room / Unit Number', Icons.meeting_room_outlined),
                 textInputAction: TextInputAction.done,
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Please enter room number' : null,
@@ -269,30 +305,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
           ),
         ),
         const SizedBox(height: 20),
+        // Language Picker Card
         Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: kSurface.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: kTextMuted.withOpacity(0.1),
-            ),
-          ),
+          padding: const EdgeInsets.all(20),
+          decoration: glassSurfaceDecoration,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Language',
-                style: TextStyle(
-                  color: kTextPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: kTextPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Select your preferred language for emergency communications',
-                style: TextStyle(color: kTextMuted, fontSize: 13),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
               LanguagePicker(
@@ -314,15 +345,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             ? null
             : [
                 BoxShadow(
-                  color: kPrimary.withOpacity(0.3),
+                  color: kBrandBlue.withValues(alpha: 0.3),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
+                ),
+                const BoxShadow(
+                  color: Color(0x59FFFFFF),
+                  blurRadius: 4,
+                  offset: Offset(0, 4),
+                  spreadRadius: -4,
                 ),
               ],
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: kPrimary,
+          backgroundColor: kBrandBlue.withValues(alpha: 0.8),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
@@ -348,7 +385,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   Text(
                     'Get Started',
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -362,10 +399,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: kSurface.withOpacity(0.3),
+        color: const Color(0x0DFFFFFF),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: kSecondary.withOpacity(0.2),
+          color: const Color(0x33FFFFFF),
         ),
       ),
       child: Row(
@@ -373,7 +410,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: kSecondary.withOpacity(0.15),
+              color: kSecondary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(

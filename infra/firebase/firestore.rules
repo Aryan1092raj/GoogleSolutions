@@ -1,6 +1,27 @@
 rules_version = '2'; 
 service cloud.firestore { 
   match /databases/{database}/documents { 
+    function staffProfilePath() {
+      return /databases/$(database)/documents/staff_profiles/$(request.auth.uid);
+    }
+
+    function hasStaffProfileForHotel(hotelId) {
+      return request.auth != null
+          && exists(staffProfilePath())
+          && get(staffProfilePath()).data.hotelId == hotelId
+          && get(staffProfilePath()).data.role in ['SECURITY', 'MANAGER', 'FIRST_RESPONDER'];
+    }
+
+    function incidentData(incidentId) {
+      return get(/databases/$(database)/documents/incidents/$(incidentId)).data;
+    }
+
+    function canReadIncident(incidentId) {
+      let incident = incidentData(incidentId);
+      return request.auth != null
+          && (request.auth.uid == incident.guestId
+              || isStaffOfHotel(incident.hotelId));
+    }
  
     match /incidents/{incidentId} { 
       allow create: if request.auth != null 
@@ -12,10 +33,48 @@ service cloud.firestore {
  
       allow update: if isStaffOfHotel(resource.data.hotelId); 
     } 
+
+    match /incidents/{incidentId}/chat_messages/{messageId} {
+      allow read: if canReadIncident(incidentId);
+      allow create: if request.auth != null
+                    && canReadIncident(incidentId)
+                    && request.resource.data.incidentId == incidentId
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() <= 500
+                    && request.resource.data.createdAtMs is int
+                    && (
+                      (request.resource.data.senderRole == 'GUEST'
+                        && request.auth.uid == incidentData(incidentId).guestId)
+                      || (request.resource.data.senderRole == 'STAFF'
+                        && isStaffOfHotel(incidentData(incidentId).hotelId))
+                    );
+      allow update, delete: if false;
+    }
+
+    match /staff_profiles/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+                            && request.auth.uid == uid
+                            && request.resource.data.hotelId is string
+                            && request.resource.data.hotelId.size() > 0
+                            && request.resource.data.role in ['SECURITY', 'MANAGER', 'FIRST_RESPONDER']
+                            && request.resource.data.updatedAtMs is int
+                            && (
+                              !('email' in request.resource.data)
+                              || request.resource.data.email is string
+                            );
+      allow delete: if false;
+    }
  
     function isStaffOfHotel(hotelId) { 
-      return request.auth.token.hotelId == hotelId 
-          && request.auth.token.role in ['SECURITY', 'MANAGER', 'FIRST_RESPONDER']; 
+      return request.auth != null
+          && (
+            (request.auth.token.hotelId == hotelId 
+              && request.auth.token.role in ['SECURITY', 'MANAGER', 'FIRST_RESPONDER'])
+            || hasStaffProfileForHotel(hotelId)
+          ); 
     } 
   } 
 }

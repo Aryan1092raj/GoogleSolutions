@@ -13,6 +13,7 @@ class SOSInitPayload {
  
 class WebSocketService { 
   WebSocketChannel? _channel; 
+  StreamSubscription? _channelSubscription;
   final StreamController<Map<String, dynamic>> _messageController = StreamController.broadcast(); 
   int _chunkIndex = 0; 
   String? _wsToken; 
@@ -20,6 +21,8 @@ class WebSocketService {
   int _reconnectDelaySec = 2;
   Timer? _reconnectTimer;
   bool _reconnecting = false;
+  bool _manuallyDisconnected = false;
+  bool _disposed = false;
  
   Stream<Map<String, dynamic>> get messages { 
     return _messageController.stream; 
@@ -30,18 +33,26 @@ class WebSocketService {
     _incidentId = incidentId; 
     _reconnectTimer?.cancel();
     _reconnecting = false;
-    final uri = Uri.parse(AppConstants.wsUrl + '?token=' + wsToken + '&incidentId=' + incidentId); 
+    _manuallyDisconnected = false;
+    await _channelSubscription?.cancel();
+    final uri = Uri.parse('${AppConstants.wsUrl}?token=$wsToken&incidentId=$incidentId'); 
     _channel = WebSocketChannel.connect(uri); 
-    _channel!.stream.listen((data) { 
+    _channelSubscription = _channel!.stream.listen((data) { 
       final decoded = jsonDecode(data);
       if (decoded is Map<String, dynamic>) {
-        _messageController.add(decoded);
+        if (!_messageController.isClosed) {
+          _messageController.add(decoded);
+        }
       } else if (decoded is Map) {
-        _messageController.add(Map<String, dynamic>.from(decoded));
+        if (!_messageController.isClosed) {
+          _messageController.add(Map<String, dynamic>.from(decoded));
+        }
       }
       _reconnectDelaySec = 2;
     }, onError: (e) { 
-      _messageController.addError(e); 
+      if (!_messageController.isClosed) {
+        _messageController.addError(e);
+      }
     }, onDone: () { 
       _onDisconnected(); 
     }); 
@@ -60,7 +71,7 @@ class WebSocketService {
         'timestampMs': DateTime.now().millisecondsSinceEpoch, 
         'video': videoB64, 
         'audio': audioB64, 
-        'mimeTypeVideo': 'video/webm', 
+        'mimeTypeVideo': 'image/jpeg', 
         'mimeTypeAudio': 'audio/pcm', 
       } 
     }); 
@@ -104,6 +115,9 @@ class WebSocketService {
   } 
  
   void _onDisconnected() { 
+    if (_manuallyDisconnected || _disposed) {
+      return;
+    }
     if (_reconnecting) {
       return;
     }
@@ -127,14 +141,26 @@ class WebSocketService {
   } 
 
   Future<void> disconnect() async {
+    _manuallyDisconnected = true;
     _reconnectTimer?.cancel();
-    _channel?.sink.close();
+    _reconnecting = false;
+    _wsToken = null;
+    _incidentId = null;
+    final channel = _channel;
     _channel = null;
+    await channel?.sink.close();
+    await _channelSubscription?.cancel();
+    _channelSubscription = null;
   }
 
   void dispose() {
+    _disposed = true;
+    _manuallyDisconnected = true;
     _reconnectTimer?.cancel();
     _channel?.sink.close();
-    _messageController.close();
+    _channelSubscription?.cancel();
+    if (!_messageController.isClosed) {
+      _messageController.close();
+    }
   }
 }

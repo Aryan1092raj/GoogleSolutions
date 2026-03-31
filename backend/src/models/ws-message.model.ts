@@ -1,7 +1,7 @@
 import { z } from 'zod'; 
  
 const devicePlatformValues = ['android', 'ios'] as const; 
-const mimeTypeVideoValues = ['video/webm', 'video/mp4'] as const; 
+const mimeTypeVideoValues = ['video/webm', 'video/mp4', 'image/jpeg'] as const; 
 const mimeTypeAudioValues = ['audio/pcm'] as const; 
 const sosEndReasonValues = ['RESOLVED_BY_GUEST', 'FALSE_ALARM'] as const; 
  

@@ -12,25 +12,52 @@ class SOSTriggerButton extends StatefulWidget {
 }
 
 class _SOSTriggerButtonState extends State<SOSTriggerButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulse;
+    with TickerProviderStateMixin {
+  // Three staggered pulse ring controllers
+  late AnimationController _pulseController1;
+  late AnimationController _pulseController2;
+  late AnimationController _pulseController3;
+
+  // Hold activation
   Timer? _holdTimer;
-  bool   _holding = false;
+  bool _holding = false;
   double _progress = 0;
   Timer? _progressTimer;
 
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(
-      vsync: this,
+
+    // Three pulse rings staggered by 400ms
+    _pulseController1 = AnimationController(
       duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
+      vsync: this,
+    )..repeat(reverse: false);
+
+    _pulseController2 = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+
+    _pulseController3 = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+
+    // Stagger the rings
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _pulseController2.repeat(reverse: false);
+    });
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) _pulseController3.repeat(reverse: false);
+    });
   }
 
   @override
   void dispose() {
-    _pulse.dispose();
+    _pulseController1.dispose();
+    _pulseController2.dispose();
+    _pulseController3.dispose();
     _holdTimer?.cancel();
     _progressTimer?.cancel();
     super.dispose();
@@ -59,56 +86,119 @@ class _SOSTriggerButtonState extends State<SOSTriggerButton>
   Widget build(BuildContext context) {
     return GestureDetector(
       onLongPressStart: (_) => _startHold(),
-      onLongPressEnd:   (_) => _cancelHold(),
+      onLongPressEnd: (_) => _cancelHold(),
       onLongPressCancel: _cancelHold,
       child: AnimatedBuilder(
-        animation: _pulse,
+        animation: _pulseController1,
         builder: (_, __) {
-          final scale = _holding ? 1.08 : (1.0 + _pulse.value * 0.05);
+          final scale = _holding ? 1.08 : (1.0 + _pulseController1.value * 0.05);
           return Transform.scale(
             scale: scale,
-            child: Stack(alignment: Alignment.center, children: [
-              // outer glow ring
-              Container(
-                width: 200, height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: kPrimary.withOpacity(0.08 + _pulse.value * 0.08),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Outer pulse ring 1 (largest, faintest)
+                AnimatedBuilder(
+                  animation: _pulseController3,
+                  builder: (context, child) {
+                    final pulseValue = _pulseController3.value;
+                    final expandedSize = 280 * (0.7 + 0.3 * pulseValue);
+                    final opacity = 0.04 * (1 - pulseValue);
+                    return Positioned(
+                      width: expandedSize,
+                      height: expandedSize,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: kPrimary.withValues(alpha: opacity),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
-              // progress ring
-              if (_holding)
-                SizedBox(
-                  width: 180, height: 180,
-                  child: CircularProgressIndicator(
-                    value: _progress,
-                    strokeWidth: 4,
-                    color: kPrimary,
-                    backgroundColor: kPrimary.withOpacity(0.2),
+                // Outer pulse ring 2 (medium)
+                AnimatedBuilder(
+                  animation: _pulseController2,
+                  builder: (context, child) {
+                    final pulseValue = _pulseController2.value;
+                    final expandedSize = 240 * (0.7 + 0.3 * pulseValue);
+                    final opacity = 0.08 * (1 - pulseValue);
+                    return Positioned(
+                      width: expandedSize,
+                      height: expandedSize,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: kPrimary.withValues(alpha: opacity),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // Outer pulse ring 3 (innermost, most visible)
+                AnimatedBuilder(
+                  animation: _pulseController1,
+                  builder: (context, child) {
+                    final pulseValue = _pulseController1.value;
+                    final expandedSize = 200 * (0.7 + 0.3 * pulseValue);
+                    final opacity = 0.15 * (1 - pulseValue);
+                    return Positioned(
+                      width: expandedSize,
+                      height: expandedSize,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: kPrimary.withValues(alpha: opacity),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // Progress ring (visible during hold)
+                if (_holding)
+                  SizedBox(
+                    width: 180,
+                    height: 180,
+                    child: CircularProgressIndicator(
+                      value: _progress,
+                      strokeWidth: 4,
+                      color: kPrimary,
+                      backgroundColor: kPrimary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                // Main SOS Button - 160px diameter
+                Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [kPrimary, Color(0xFFff5545)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimary.withValues(alpha: 0.4),
+                        blurRadius: 40,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'SOS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 3,
+                      ),
+                    ),
                   ),
                 ),
-              // button
-              Container(
-                width: 160, height: 160,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [kPrimary, Color(0xFFff5545)],
-                  ),
-                ),
-                child: const Center(
-                  child: Text('SOS',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2,
-                    )),
-                ),
-              ),
-            ]),
+              ],
+            ),
           );
         },
       ),

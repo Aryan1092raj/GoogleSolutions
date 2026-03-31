@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LiveIncidentCard {
   final String incidentId;
@@ -12,6 +13,7 @@ class LiveIncidentCard {
   final String wing;
   final String guestName;
   final String primaryHazard;
+  final String aiStatus;
   final String aiSummary;
   final int lastUpdatedMs;
   final bool isStreamLive;
@@ -26,6 +28,7 @@ class LiveIncidentCard {
     required this.wing,
     required this.guestName,
     required this.primaryHazard,
+    required this.aiStatus,
     required this.aiSummary,
     required this.lastUpdatedMs,
     required this.isStreamLive,
@@ -42,10 +45,13 @@ class LiveIncidentCard {
       wing: json['wing'] == null ? '' : json['wing'].toString(),
       guestName: json['guestName'] == null ? '' : json['guestName'].toString(),
       primaryHazard: json['primaryHazard'] == null ? 'UNKNOWN' : json['primaryHazard'].toString(),
+      aiStatus: json['aiStatus'] == null
+          ? ((json['aiSummary']?.toString().isNotEmpty ?? false) ? 'AVAILABLE' : 'PENDING')
+          : json['aiStatus'].toString(),
       aiSummary: json['aiSummary'] == null ? '' : json['aiSummary'].toString(),
       lastUpdatedMs: json['lastUpdatedMs'] == null ? 0 : int.tryParse(json['lastUpdatedMs'].toString()) ?? 0,
       isStreamLive: json['isStreamLive'] == true,
-      acknowledgedBy: json['acknowledgedBy'] == null ? null : json['acknowledgedBy'].toString(),
+      acknowledgedBy: json['acknowledgedBy']?.toString(),
     );
   }
 }
@@ -97,4 +103,18 @@ Future<void> markStaffOnline(StaffProfile profile, {required String name}) async
     'lastSeenMs': DateTime.now().millisecondsSinceEpoch,
     'isOnDuty': true,
   });
+}
+
+Future<void> syncStaffAccessProfile(StaffProfile profile, {required String email}) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null || profile.hotelId.isEmpty) {
+    return;
+  }
+
+  await FirebaseFirestore.instance.collection('staff_profiles').doc(user.uid).set({
+    'hotelId': profile.hotelId,
+    'role': profile.role,
+    'email': email,
+    'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
+  }, SetOptions(merge: true));
 }

@@ -28,7 +28,7 @@ class LanguagePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: _kLanguages.containsKey(value) ? value : 'en',
+      initialValue: _kLanguages.containsKey(value) ? value : 'en',
       decoration: InputDecoration(
         labelText: 'Language',
         prefixIcon: const Icon(Icons.language),

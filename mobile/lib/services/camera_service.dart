@@ -4,15 +4,47 @@ import 'package:flutter/widgets.dart';
  
 class CameraService { 
   CameraController? _controller; 
+  Future<void>? _initializeFuture;
  
   Future<void> initialize() async { 
     if (_controller != null && _controller!.value.isInitialized) {
       return;
     }
-    final cameras = await availableCameras(); 
-    _controller = CameraController(cameras.first, ResolutionPreset.medium, enableAudio: true, imageFormatGroup: ImageFormatGroup.yuv420); 
-    await _controller!.initialize(); 
+    if (_initializeFuture != null) {
+      return _initializeFuture!;
+    }
+
+    _initializeFuture = _initializeInternal();
+    try {
+      await _initializeFuture;
+    } finally {
+      _initializeFuture = null;
+    }
   } 
+
+  Future<void> _initializeInternal() async {
+    final cameras = await availableCameras();
+    if (cameras.isEmpty) {
+      throw CameraException('noCamera', 'No camera available on this device.');
+    }
+
+    final previous = _controller;
+    final nextController = CameraController(
+      cameras.first,
+      ResolutionPreset.low,
+      enableAudio: true,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+
+    try {
+      await nextController.initialize();
+      _controller = nextController;
+      await previous?.dispose();
+    } catch (_) {
+      await nextController.dispose();
+      rethrow;
+    }
+  }
  
   void startCapture() {} 
   void stopCapture() {} 
@@ -38,6 +70,7 @@ class CameraService {
   } 
 
   void dispose() {
+    _initializeFuture = null;
     _controller?.dispose();
     _controller = null;
   }

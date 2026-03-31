@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -74,6 +75,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
   StreamSubscription<Map<String, dynamic>>? _sub;
   Timer? _locationTimer;
   Timer? _pingTimer;
+  bool _ignoringIncomingMessages = false;
 
   SOSNotifier(this._ws, this._camera, this._location, this._ref)
       : super(const SOSState(status: SOSStatus.idle, helpOnWay: false)) {
@@ -81,36 +83,47 @@ class SOSNotifier extends StateNotifier<SOSState> {
   }
 
   Future<void> triggerSOS() async {
+    if (!mounted) return;
     final profile = _ref.read(guestProfileProvider);
     if (profile == null) {
+      if (!mounted) return;
       state = state.copyWith(status: SOSStatus.error, error: 'Guest profile missing');
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (!mounted) return;
       state = state.copyWith(status: SOSStatus.error, error: 'Guest is not authenticated');
       return;
     }
 
+    if (!mounted) return;
     state = state.copyWith(status: SOSStatus.initiating, error: null);
 
     try {
       await _camera.initialize();
     } catch (_) {}
+    if (!mounted) return;
 
     final incidentId = const Uuid().v4();
-    final idToken = await user.getIdToken();
+    // Force refresh to get a fresh token after signInWithCustomToken
+    final idToken = await user.getIdToken(true);
+    if (!mounted) return;
 
     double? lat;
     double? lng;
-    try {
-      final pos = await _location.getCurrentPosition();
-      lat = pos.latitude;
-      lng = pos.longitude;
-    } catch (_) {}
+    // Skip location on web - geolocator doesn't work fully on web
+    if (!kIsWeb) {
+      try {
+        final pos = await _location.getCurrentPosition();
+        lat = pos.latitude;
+        lng = pos.longitude;
+      } catch (_) {}
+      if (!mounted) return;
+    }
 
-    final createReq = {
+    final createReq = <String, dynamic>{
       'incidentId': incidentId,
       'hotelId': profile.hotelId,
       'roomNumber': profile.roomNumber,
@@ -119,25 +132,25 @@ class SOSNotifier extends StateNotifier<SOSState> {
       'guestId': profile.guestId,
       'guestName': profile.guestName,
       'guestLanguage': profile.language,
-      'lat': lat,
-      'lng': lng,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
     };
 
-    final client = HttpClient();
     try {
-      final uri = Uri.parse(AppConstants.backendBaseUrl + '/api/incidents');
-      final req = await client.postUrl(uri);
-      req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${idToken ?? ""}');
-      req.add(utf8.encode(jsonEncode(createReq)));
-
-      final resp = await req.close();
-      final body = await resp.transform(utf8.decoder).join();
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/api/incidents');
+      final resp = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${idToken ?? ""}',
+        },
+        body: jsonEncode(createReq),
+      );
 
       if (resp.statusCode != 201) {
         var message = 'Failed to create incident';
         try {
-          final parsed = jsonDecode(body) as Map<String, dynamic>;
+          final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
           if (parsed['error'] != null) {
             message = parsed['error'].toString();
           }
@@ -145,13 +158,14 @@ class SOSNotifier extends StateNotifier<SOSState> {
         throw Exception(message);
       }
 
-      final parsed = jsonDecode(body) as Map<String, dynamic>;
+      final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
       final wsToken = parsed['wsToken']?.toString() ?? '';
       if (wsToken.isEmpty) {
         throw Exception('Missing wsToken from /api/incidents response');
       }
 
       await _ws.connect(wsToken, incidentId);
+      if (!mounted) return;
       _ws.sendSOSInit(
         SOSInitPayload({
           'incidentId': incidentId,
@@ -165,26 +179,28 @@ class SOSNotifier extends StateNotifier<SOSState> {
           'lat': lat,
           'lng': lng,
           'deviceInfo': {
-            'platform': Platform.isIOS ? 'ios' : 'android',
-            'osVersion': Platform.operatingSystemVersion,
+            'platform': kIsWeb ? 'android' : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android'),
+            'osVersion': kIsWeb ? 'web' : '',
           }
         }),
       );
 
       _startLiveMetadataUpdates(incidentId);
+      if (!mounted) return;
       state = state.copyWith(status: SOSStatus.active, incidentId: incidentId);
     } catch (error) {
+      if (!mounted) return;
       state = state.copyWith(status: SOSStatus.error, error: error.toString());
-    } finally {
-      client.close(force: true);
     }
   }
 
   Future<void> endSOS(String reason) async {
+    if (!mounted) return;
     final current = state;
     if (current.incidentId == null) {
       return;
     }
+    _ignoringIncomingMessages = true;
     final id = current.incidentId as String;
     _ws.sendSOSend(id, reason);
     _locationTimer?.cancel();
@@ -193,11 +209,17 @@ class SOSNotifier extends StateNotifier<SOSState> {
   }
 
   void _handleWsMessage(Map<String, dynamic> msg) {
+    // Guard: do not update state if the notifier has been disposed
+    if (!mounted || _ignoringIncomingMessages) return;
+
     final current = state;
     final type = msg['type'];
-    final payload = msg['payload'] is Map ? Map<String, dynamic>.from(msg['payload']) : <String, dynamic>{};
+    final payload = msg['payload'] is Map
+        ? Map<String, dynamic>.from(msg['payload'] as Map)
+        : <String, dynamic>{};
 
     if (type == 'AI_STATUS') {
+      if (!mounted) return;
       state = current.copyWith(
         status: SOSStatus.active,
         aiMessage: payload['message']?.toString(),
@@ -208,26 +230,33 @@ class SOSNotifier extends StateNotifier<SOSState> {
     }
 
     if (type == 'SOS_ACCEPTED') {
+      if (!mounted) return;
       state = current.copyWith(status: SOSStatus.active, helpOnWay: true);
       return;
     }
 
     if (type == 'INCIDENT_RESOLVED') {
+      if (!mounted) return;
       state = current.copyWith(status: SOSStatus.resolved);
       return;
     }
 
     if (type == 'WS_ERROR') {
-      state = current.copyWith(status: SOSStatus.error, error: payload['message']?.toString());
+      if (!mounted) return;
+      state = current.copyWith(
+        status: SOSStatus.error,
+        error: payload['message']?.toString());
       return;
     }
   }
 
   @override
   void dispose() {
+    _ignoringIncomingMessages = true;
     _sub?.cancel();
     _locationTimer?.cancel();
     _pingTimer?.cancel();
+    unawaited(_ws.disconnect());
     super.dispose();
   }
 
