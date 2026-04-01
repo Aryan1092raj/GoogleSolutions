@@ -2,15 +2,39 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
+import '../../../services/sos_queue_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/sos_provider.dart';
 import '../widgets/sos_trigger_button.dart';
 
-class SOSHomeScreen extends ConsumerWidget {
+class SOSHomeScreen extends ConsumerStatefulWidget {
   const SOSHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SOSHomeScreen> createState() => _SOSHomeScreenState();
+}
+
+class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
+  bool _hasPendingSOS = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPendingSOS();
+  }
+
+  Future<void> _checkPendingSOS() async {
+    final hasPending = await SOSQueueService.hasPending();
+    if (mounted) {
+      setState(() {
+        _hasPendingSOS = hasPending;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final profile = ref.watch(guestProfileProvider);
     final sosState = ref.watch(sosProvider);
     final hotel = profile?.hotelId ?? '—';
@@ -28,11 +52,104 @@ class SOSHomeScreen extends ConsumerWidget {
           SafeArea(
             child: Column(
               children: [
+                // Pending SOS banner
+                if (_hasPendingSOS) _buildPendingBanner(ref),
                 _buildContextBar(context, hotel, room),
                 Expanded(
                   child: _buildMainContent(context, ref, sosState),
                 ),
                 _buildLanguagePill(lang),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingBanner(WidgetRef ref) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.amber.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.amber,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Pending SOS',
+                  style: TextStyle(
+                    color: Colors.amber,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Waiting for connection to submit',
+                  style: TextStyle(
+                    color: Colors.amber.withValues(alpha: 0.8),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Retry button
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () async {
+              await ref.read(sosProvider.notifier).triggerSOS();
+              final state = ref.read(sosProvider);
+              if (state.status != SOSStatus.queued &&
+                  state.status != SOSStatus.error) {
+                setState(() {
+                  _hasPendingSOS = false;
+                });
+              }
+            },
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.refresh, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'Retry',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -125,7 +242,8 @@ class SOSHomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMainContent(BuildContext context, WidgetRef ref, SOSState sosState) {
+  Widget _buildMainContent(
+      BuildContext context, WidgetRef ref, SOSState sosState) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -195,8 +313,10 @@ class SOSHomeScreen extends ConsumerWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              _HomeSignal(label: 'Live video relay', icon: Icons.videocam_outlined),
-              _HomeSignal(label: 'Location context', icon: Icons.location_on_outlined),
+              _HomeSignal(
+                  label: 'Live video relay', icon: Icons.videocam_outlined),
+              _HomeSignal(
+                  label: 'Location context', icon: Icons.location_on_outlined),
               _HomeSignal(label: 'Rescue channel', icon: Icons.forum_outlined),
             ],
           ),
@@ -231,19 +351,22 @@ class SOSHomeScreen extends ConsumerWidget {
                 ? _buildConnectingIndicator()
                 : Container(
                     key: const ValueKey('reassurance'),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: glassSurfaceDecoration,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.shield_moon_outlined, color: kSecondary, size: 16),
+                        const Icon(Icons.shield_moon_outlined,
+                            color: kSecondary, size: 16),
                         const SizedBox(width: 8),
                         Text(
                           'Stay calm. The emergency desk is on standby.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: kTextPrimary,
-                                fontSize: 13,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: kTextPrimary,
+                                    fontSize: 13,
+                                  ),
                         ),
                       ],
                     ),

@@ -7,8 +7,23 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/theme.dart';
 import '../../../core/constants.dart';
+import '../../../core/widgets/interactive_background.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/widgets/language_picker.dart';
+import '../../auth/screens/scan_qr_screen.dart';
+
+const _kRoomTypes = [
+  'Standard Room',
+  'Deluxe Room',
+  'Suite',
+  'Presidential Suite',
+  'Conference Room',
+  'Lobby',
+  'Restaurant',
+  'Gym',
+  'Pool Area',
+  'Other',
+];
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -23,6 +38,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   final _hotelIdCtrl = TextEditingController();
   final _roomCtrl = TextEditingController();
   String _selectedLang = 'en';
+  String _roomType = 'Standard Room';
+  int? _floor;
+  String? _wing;
   bool _loading = false;
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
@@ -88,6 +106,23 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     );
   }
 
+  void _scanQr() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ScanQrScreen(
+          onScanned: (data) {
+            setState(() {
+              _hotelIdCtrl.text = data['hotelId'] as String;
+              _roomCtrl.text = data['roomNumber'] as String;
+              _floor = data['floor'] as int;
+              _wing = data['wing'] as String;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -98,15 +133,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     setState(() => _loading = true);
 
     try {
-      final uri = Uri.parse('${AppConstants.backendBaseUrl}/api/auth/guest-token');
+      final uri =
+          Uri.parse('${AppConstants.backendBaseUrl}/api/auth/guest-token');
       final resp = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'hotelId': hotelId,
           'roomNumber': room,
+          'roomType': _roomType,
           'guestName': name,
           'language': _selectedLang,
+          if (_floor != null) 'floor': _floor,
+          if (_wing != null) 'wing': _wing,
         }),
       );
 
@@ -140,6 +179,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               roomNumber: room,
               language: _selectedLang,
               hotelId: hotelId,
+              floor: _floor,
+              wing: _wing,
             ),
           );
 
@@ -173,38 +214,40 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Dark background
-          Container(color: kBackground),
-          // Background glow in top-left
-          buildBackgroundGlow(alignment: Alignment.topLeft),
-          // Content
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 48),
-                      _buildForm(),
-                      const SizedBox(height: 40),
-                      _buildCTA(),
-                      const SizedBox(height: 24),
-                      _buildFooter(),
-                    ],
+    return InteractiveBackground(
+      child: Scaffold(
+        body: Stack(
+          children: [
+            // Dark background
+            Container(color: kBackground),
+            // Background glow in top-left
+            buildBackgroundGlow(alignment: Alignment.topLeft),
+            // Content
+            SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: 48),
+                        _buildForm(),
+                        const SizedBox(height: 40),
+                        _buildCTA(),
+                        const SizedBox(height: 24),
+                        _buildFooter(),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -282,23 +325,65 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 'Enter your hotel details to get started',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              const SizedBox(height: 16),
+              // Scan QR Code button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _scanQr,
+                  icon: const Icon(Icons.qr_code_scanner, size: 20),
+                  label: const Text('Scan QR Code'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kTextPrimary,
+                    side: const BorderSide(color: kSecondary, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '— OR —',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: kTextMuted,
+                      fontSize: 12,
+                    ),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 20),
               TextFormField(
                 controller: _hotelIdCtrl,
                 style: const TextStyle(color: kTextPrimary),
                 decoration: _field('Hotel or Venue Code', Icons.hotel_outlined),
                 textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Please enter hotel code' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Please enter hotel code'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _roomType,
+                decoration: _field('Room Type', Icons.category_outlined),
+                dropdownColor: kSurface,
+                style: const TextStyle(color: kTextPrimary),
+                items: _kRoomTypes
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                    .toList(),
+                onChanged: (v) =>
+                    setState(() => _roomType = v ?? 'Standard Room'),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _roomCtrl,
                 style: const TextStyle(color: kTextPrimary),
-                decoration: _field('Room / Unit Number', Icons.meeting_room_outlined),
+                decoration:
+                    _field('Room / Unit Number', Icons.meeting_room_outlined),
                 textInputAction: TextInputAction.done,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Please enter room number' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Please enter room number'
+                    : null,
                 onFieldSubmitted: (_) => _submit(),
               ),
             ],

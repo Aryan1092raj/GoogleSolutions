@@ -1,13 +1,48 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/severity_colors.dart';
+import '../../../core/widgets/interactive_background.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/sos_provider.dart';
 import '../providers/stream_provider.dart';
 import '../widgets/incident_chat_panel.dart';
+
+/// Camera preview background widget that displays live camera feed
+class _CameraBackground extends ConsumerWidget {
+  const _CameraBackground();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final camera = ref.watch(cameraServiceProvider);
+
+    if (!camera.buildPreview().toString().contains('CameraPreview')) {
+      // Camera not initialized yet, show loading indicator
+      return Container(
+        color: kBackground,
+        child: const Center(
+          child: CircularProgressIndicator(
+            color: kPrimary,
+            strokeWidth: 2.5,
+          ),
+        ),
+      );
+    }
+
+    return FittedBox(
+      fit: BoxFit.cover,
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        child: camera.buildPreview(),
+      ),
+    );
+  }
+}
 
 class SOSActiveScreen extends ConsumerStatefulWidget {
   final String incidentId;
@@ -25,6 +60,10 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
   final _start = DateTime.now();
   bool _streamStartRequested = false;
   String? _previousSeverity;
+
+  // ETA countdown timer
+  Timer? _etaTimer;
+  int _etaSecondsRemaining = 0;
 
   @override
   void initState() {
@@ -44,6 +83,16 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
       vsync: this,
     );
 
+    // Listen to SOS state changes for ETA timer
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listen<SOSState>(sosProvider, (previous, next) {
+        if (next.etaMinutes != null &&
+            next.etaMinutes != _etaSecondsRemaining ~/ 60) {
+          _startEtaTimer(next.etaMinutes!);
+        }
+      });
+    });
+
     Future.microtask(() async {
       if (!mounted || _streamStartRequested) {
         return;
@@ -53,12 +102,33 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     });
   }
 
+  void _startEtaTimer(int etaMinutes) {
+    _etaTimer?.cancel();
+    _etaSecondsRemaining = etaMinutes * 60;
+
+    _etaTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        if (_etaSecondsRemaining > 0) {
+          _etaSecondsRemaining--;
+        } else {
+          timer.cancel();
+        }
+      });
+    });
+  }
+
   @override
   void dispose() {
     ref.read(streamProvider.notifier).stopStreaming();
     _pulseController.dispose();
     _slideController.dispose();
     _severityFlashController.dispose();
+    _etaTimer?.cancel();
     super.dispose();
   }
 
@@ -109,11 +179,69 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
       _previousSeverity = severity;
     });
 
+    // Show queued state overlay if status is queued
+    if (state.status == SOSStatus.queued) {
+      return _buildQueuedOverlay();
+    }
+
+    return InteractiveBackground(
+      child: Scaffold(
+        backgroundColor: kBackground,
+        body: Stack(
+          children: [
+            // Camera preview background
+            const _CameraBackground(),
+            // Dark gradient overlay
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      kBackground.withValues(alpha: 0.6),
+                      Colors.transparent,
+                      kBackground.withValues(alpha: 0.85),
+                    ],
+                    stops: const [0, 0.35, 1],
+                  ),
+                ),
+              ),
+            ),
+            // Content
+            SafeArea(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  children: [
+                    _buildTopBar(severity),
+                    const Spacer(),
+                    _buildBottomPanel(
+                      context,
+                      state,
+                      profile,
+                      severity,
+                      message,
+                      severityColorVal,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build overlay for queued SOS state with orange pulsing border.
+  Widget _buildQueuedOverlay() {
     return Scaffold(
       backgroundColor: kBackground,
       body: Stack(
         children: [
-          // Camera preview background would be here (handled by parent or overlay)
+          // Dark background
           Positioned.fill(
             child: Container(color: kBackground),
           ),
@@ -127,30 +255,120 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
                   colors: [
                     kBackground.withValues(alpha: 0.75),
                     Colors.transparent,
-                    kBackground.withValues(alpha: 0.92),
+                    kBackground.withValues(alpha: 0.95),
                   ],
                   stops: const [0, 0.35, 1],
                 ),
               ),
             ),
           ),
-          // Content
+          // Centered queued message
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                children: [
-                  _buildTopBar(severity),
-                  const Spacer(),
-                  _buildBottomPanel(
-                    context,
-                    state,
-                    profile,
-                    severity,
-                    message,
-                    severityColorVal,
-                  ),
-                ],
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    return Container(
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.orange.withValues(
+                            alpha: 0.4 + (_pulseController.value * 0.6),
+                          ),
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.orange.withValues(
+                              alpha: 0.2 * _pulseController.value,
+                            ),
+                            blurRadius: 30,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Pulsing SOS icon
+                          AnimatedBuilder(
+                            animation: _pulseController,
+                            builder: (context, _) {
+                              return Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.orange.withValues(
+                                    alpha:
+                                        0.15 + (_pulseController.value * 0.15),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.sos_rounded,
+                                  color: Colors.orange,
+                                  size: 40,
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          // Title
+                          const Text(
+                            'SOS Queued',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Subtitle
+                          AnimatedBuilder(
+                            animation: _pulseController,
+                            builder: (context, _) {
+                              return Text(
+                                'Reconnecting...',
+                                style: TextStyle(
+                                  color: Colors.orange.withValues(
+                                    alpha: 0.7 + (_pulseController.value * 0.3),
+                                  ),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          // Info text
+                          const Text(
+                            'Your emergency request will be sent automatically when connection is restored.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: kTextMuted,
+                              fontSize: 14,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          // Loading indicator
+                          const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.orange,
+                              strokeWidth: 2.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -177,7 +395,8 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: kPrimary.withValues(alpha: 0.5 * _pulseController.value),
+                    color: kPrimary.withValues(
+                        alpha: 0.5 * _pulseController.value),
                     blurRadius: 20,
                     spreadRadius: 2,
                   ),
@@ -383,7 +602,7 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
         final flashValue = _severityFlashController.isAnimating
             ? _severityFlashController.value
             : 0.0;
-        
+
         // Border color flashes between severity color and transparent
         final animatedBorderColor = severityColorVal.withValues(
           alpha: 0.4 + (flashValue * 0.6), // Oscillates between 0.4 and 1.0
@@ -452,12 +671,52 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
                           size: 14,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          state.helpOnWay ? 'Help is on the way' : 'Dispatching...',
-                          style: TextStyle(
-                            color: state.helpOnWay ? kSecondary : kTextMuted,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                state.helpOnWay
+                                    ? 'Help is on the way'
+                                    : 'Dispatching...',
+                                style: TextStyle(
+                                  color:
+                                      state.helpOnWay ? kSecondary : kTextMuted,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              // ETA Countdown Timer
+                              if (state.etaMinutes != null &&
+                                  _etaSecondsRemaining > 0)
+                                StreamBuilder(
+                                  stream: Stream.periodic(
+                                      const Duration(seconds: 1)),
+                                  builder: (_, __) {
+                                    final minutes = _etaSecondsRemaining ~/ 60;
+                                    final seconds = _etaSecondsRemaining % 60;
+                                    return Text(
+                                      'Help arriving in ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                                      style: const TextStyle(
+                                        color: kSecondary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    );
+                                  },
+                                )
+                              else if (state.etaMinutes != null &&
+                                  _etaSecondsRemaining <= 0)
+                                const Text(
+                                  'Responders should be with you now',
+                                  style: TextStyle(
+                                    color: kSecondary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],
@@ -542,7 +801,9 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
                 message: 'Only end if the situation is resolved.',
               );
               if (confirm == true && context.mounted) {
-                await ref.read(sosProvider.notifier).endSOS('RESOLVED_BY_GUEST');
+                await ref
+                    .read(sosProvider.notifier)
+                    .endSOS('RESOLVED_BY_GUEST');
                 if (context.mounted) {
                   context.go('/sos/resolved/${widget.incidentId}');
                 }

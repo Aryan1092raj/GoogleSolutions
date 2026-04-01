@@ -7,6 +7,8 @@ class GuestProfile {
   final String roomNumber;
   final String language;
   final String hotelId;
+  final int? floor;
+  final String? wing;
 
   const GuestProfile({
     required this.guestId,
@@ -14,6 +16,8 @@ class GuestProfile {
     required this.roomNumber,
     required this.language,
     required this.hotelId,
+    this.floor,
+    this.wing,
   });
 
   // Fix #5 — copyWith required by onboarding_screen and SOS language picker
@@ -23,6 +27,8 @@ class GuestProfile {
     String? roomNumber,
     String? language,
     String? hotelId,
+    int? floor,
+    String? wing,
   }) {
     return GuestProfile(
       guestId: guestId ?? this.guestId,
@@ -30,6 +36,8 @@ class GuestProfile {
       roomNumber: roomNumber ?? this.roomNumber,
       language: language ?? this.language,
       hotelId: hotelId ?? this.hotelId,
+      floor: floor ?? this.floor,
+      wing: wing ?? this.wing,
     );
   }
 }
@@ -49,6 +57,8 @@ class GuestProfileNotifier extends StateNotifier<GuestProfile?> {
     required String hotelId,
     required String roomNumber,
     required String language,
+    int? floor,
+    String? wing,
   }) {
     state = GuestProfile(
       guestId: guestId,
@@ -56,6 +66,8 @@ class GuestProfileNotifier extends StateNotifier<GuestProfile?> {
       hotelId: hotelId,
       roomNumber: roomNumber,
       language: language,
+      floor: floor,
+      wing: wing,
     );
   }
 

@@ -239,33 +239,33 @@ export async function updateIncidentAiState(incidentId, aiStatus, aiSummary, det
   return nextIncident;
 }
 
-export async function updateIncidentStatus(incidentId, status, staffId, note, staffName) { 
-  const firestore = getFirestore(); 
-  const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId); 
-  const snapshot = await ref.get(); 
-  if (!snapshot.exists) { 
-    return null; 
-  } 
- 
-  const incident = snapshot.data(); 
-  const updates: any = { status: status, updatedAt: nowTs() }; 
-  if (status === 'RESOLVED') { 
-    updates.resolvedAt = nowTs(); 
-    updates.isStreamLive = false; 
-  } 
-  if (status === 'FALSE_ALARM') { 
-    updates.resolvedAt = nowTs(); 
-    updates.isStreamLive = false; 
-  } 
-  if (status === 'ACKNOWLEDGED') { 
-    if (staffId) { 
-      updates.acknowledgedBy = staffId; 
-    } 
-  } 
- 
-  await ref.update(updates); 
-  const nextIncident = Object.assign({}, incident, updates); 
-  await updateLiveCardByIncident(nextIncident); 
+export async function updateIncidentStatus(incidentId, status, staffId, note, staffName) {
+  const firestore = getFirestore();
+  const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    return null;
+  }
+
+  const incident = snapshot.data();
+  const updates: any = { status: status, updatedAt: nowTs() };
+  if (status === 'RESOLVED') {
+    updates.resolvedAt = nowTs();
+    updates.isStreamLive = false;
+  }
+  if (status === 'FALSE_ALARM') {
+    updates.resolvedAt = nowTs();
+    updates.isStreamLive = false;
+  }
+  if (status === 'ACKNOWLEDGED') {
+    if (staffId) {
+      updates.acknowledgedBy = staffId;
+    }
+  }
+
+  await ref.update(updates);
+  const nextIncident = Object.assign({}, incident, updates);
+  await updateLiveCardByIncident(nextIncident);
   await addActionHistory(incidentId, {
     actorId: staffId ? staffId : 'system',
     actorLabel: staffName ? staffName : 'System',
@@ -273,18 +273,46 @@ export async function updateIncidentStatus(incidentId, status, staffId, note, st
     title: 'Status updated',
     detail: `Incident status changed to ${status}.`,
   });
- 
-  if (note) { 
-    await addResponderLog(incidentId, { 
-      staffId: staffId ? staffId : 'system', 
-      staffName: staffName ? staffName : 'System', 
-      action: note, 
-      type: 'ACTION', 
-    }); 
-  } 
- 
-  return nextIncident; 
-} 
+
+  if (note) {
+    await addResponderLog(incidentId, {
+      staffId: staffId ? staffId : 'system',
+      staffName: staffName ? staffName : 'System',
+      action: note,
+      type: 'ACTION',
+    });
+  }
+
+  return nextIncident;
+}
+
+export async function updateIncidentEta(incidentId: string, etaMinutes: number) {
+  const firestore = getFirestore();
+  const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    return null;
+  }
+
+  const incident = snapshot.data();
+  const updates: any = {
+    etaMinutes: etaMinutes,
+    etaSetAt: new Date().toISOString(),
+    updatedAt: nowTs(),
+  };
+
+  await ref.update(updates);
+  const nextIncident = Object.assign({}, incident, updates);
+  await updateLiveCardByIncident(nextIncident);
+  await addActionHistory(incidentId, {
+    actorId: 'system',
+    actorLabel: 'System',
+    type: 'STATUS',
+    title: 'ETA set',
+    detail: `Help ETA set to ${etaMinutes} minutes.`,
+  });
+  return nextIncident;
+}
  
 export async function addResponderLog(incidentId, payload) { 
   const firestore = getFirestore(); 

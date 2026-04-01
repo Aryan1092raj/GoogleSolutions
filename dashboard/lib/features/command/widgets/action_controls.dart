@@ -19,11 +19,15 @@ class ActionControls extends ConsumerStatefulWidget {
 class _ActionControlsState extends ConsumerState<ActionControls> {
   final _noteCtrl = TextEditingController();
   bool _sending = false;
+  int? _selectedEtaMinutes;
+
+  // ETA options for dropdown
+  final List<int> _etaOptions = [1, 2, 3, 5, 10, 15, 20, 30];
 
   bool get _hasIncident =>
       widget.incidentId.isNotEmpty && widget.incidentId != '-';
 
-  Future<void> _patchStatus(String status) async {
+  Future<void> _patchStatus(String status, {int? etaMinutes}) async {
     if (!_hasIncident) return;
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -35,13 +39,18 @@ class _ActionControlsState extends ConsumerState<ActionControls> {
       final uri = Uri.parse(
         '${DashboardConstants.backendBaseUrl}/api/incidents/${widget.incidentId}/status',
       );
+      final body = <String, dynamic>{'status': status};
+      if (etaMinutes != null) {
+        body['etaMinutes'] = etaMinutes;
+      }
+
       final response = await http.patch(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
         },
-        body: jsonEncode({'status': status}),
+        body: jsonEncode(body),
       );
 
       if (response.statusCode != 200) {
@@ -51,7 +60,8 @@ class _ActionControlsState extends ConsumerState<ActionControls> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Status updated to $status'),
+          content: Text(
+              'Status updated to $status${etaMinutes != null ? ' - ETA: $etaMinutes min' : ''}'),
           backgroundColor: kDashSurface,
         ));
       }
@@ -100,8 +110,8 @@ class _ActionControlsState extends ConsumerState<ActionControls> {
       );
 
       if (response.statusCode != 201) {
-        throw Exception(_extractBackendError(response.body,
-            fallback: 'Action log failed'));
+        throw Exception(
+            _extractBackendError(response.body, fallback: 'Action log failed'));
       }
 
       _noteCtrl.clear();
@@ -167,6 +177,54 @@ class _ActionControlsState extends ConsumerState<ActionControls> {
             ],
           ),
           const SizedBox(height: 14),
+          // ETA Selection Row
+          Row(
+            children: [
+              Text(
+                'ETA (min):',
+                style: GoogleFonts.inter(
+                  color: kDashText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: kDashSurface.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kDashBorder),
+                ),
+                child: DropdownButton<int>(
+                  value: _selectedEtaMinutes,
+                  hint: const Text('Select'),
+                  dropdownColor: kDashSurface,
+                  style: GoogleFonts.inter(
+                    color: kDashText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  underline: const SizedBox(),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  items: _etaOptions.map((eta) {
+                    return DropdownMenuItem<int>(
+                      value: eta,
+                      child: Text('$eta min'),
+                    );
+                  }).toList(),
+                  onChanged: _hasIncident
+                      ? (value) {
+                          setState(() {
+                            _selectedEtaMinutes = value;
+                          });
+                        }
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -182,8 +240,43 @@ class _ActionControlsState extends ConsumerState<ActionControls> {
                     ],
                   ),
                   child: ElevatedButton(
-                    onPressed:
-                        _hasIncident ? () => _patchStatus('ACKNOWLEDGED') : null,
+                    onPressed: _hasIncident
+                        ? () {
+                            if (_selectedEtaMinutes == null) {
+                              // Show confirmation if no ETA selected
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: kDashSurface,
+                                  title: const Text(
+                                    'Acknowledge without ETA?',
+                                    style: TextStyle(color: kDashText),
+                                  ),
+                                  content: const Text(
+                                    'Set an ETA so the guest knows when help will arrive.',
+                                    style: TextStyle(color: kDashTextMut),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        _patchStatus('ACKNOWLEDGED');
+                                      },
+                                      child: const Text('Acknowledge Anyway'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            } else {
+                              _patchStatus('ACKNOWLEDGED',
+                                  etaMinutes: _selectedEtaMinutes);
+                            }
+                          }
+                        : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kDashInfo.withValues(alpha: 0.8),
                       foregroundColor: Colors.white,

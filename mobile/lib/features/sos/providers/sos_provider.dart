@@ -1,19 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../../../core/constants.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../services/camera_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/websocket_service.dart';
+import '../../../services/sos_queue_service.dart';
 
-enum SOSStatus { idle, initiating, active, resolving, resolved, error }
+enum SOSStatus { idle, initiating, active, resolving, resolved, error, queued }
 
 class SOSState {
   final SOSStatus status;
@@ -21,6 +25,7 @@ class SOSState {
   final String? aiMessage;
   final String? severity;
   final bool helpOnWay;
+  final int? etaMinutes;
   final String? error;
 
   const SOSState({
@@ -29,6 +34,7 @@ class SOSState {
     this.aiMessage,
     this.severity,
     required this.helpOnWay,
+    this.etaMinutes,
     this.error,
   });
 
@@ -38,6 +44,7 @@ class SOSState {
     String? aiMessage,
     String? severity,
     bool? helpOnWay,
+    int? etaMinutes,
     String? error,
   }) {
     return SOSState(
@@ -46,6 +53,7 @@ class SOSState {
       aiMessage: aiMessage ?? this.aiMessage,
       severity: severity ?? this.severity,
       helpOnWay: helpOnWay ?? this.helpOnWay,
+      etaMinutes: etaMinutes ?? this.etaMinutes,
       error: error ?? this.error,
     );
   }
@@ -73,6 +81,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
   final LocationService _location;
   final Ref _ref;
   StreamSubscription<Map<String, dynamic>>? _sub;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _locationTimer;
   Timer? _pingTimer;
   bool _ignoringIncomingMessages = false;
@@ -87,14 +96,16 @@ class SOSNotifier extends StateNotifier<SOSState> {
     final profile = _ref.read(guestProfileProvider);
     if (profile == null) {
       if (!mounted) return;
-      state = state.copyWith(status: SOSStatus.error, error: 'Guest profile missing');
+      state = state.copyWith(
+          status: SOSStatus.error, error: 'Guest profile missing');
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (!mounted) return;
-      state = state.copyWith(status: SOSStatus.error, error: 'Guest is not authenticated');
+      state = state.copyWith(
+          status: SOSStatus.error, error: 'Guest is not authenticated');
       return;
     }
 
@@ -137,61 +148,148 @@ class SOSNotifier extends StateNotifier<SOSState> {
     };
 
     try {
-      final uri = Uri.parse('${AppConstants.backendBaseUrl}/api/incidents');
-      final resp = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${idToken ?? ""}',
-        },
-        body: jsonEncode(createReq),
-      );
-
-      if (resp.statusCode != 201) {
-        var message = 'Failed to create incident';
-        try {
-          final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
-          if (parsed['error'] != null) {
-            message = parsed['error'].toString();
-          }
-        } catch (_) {}
-        throw Exception(message);
-      }
-
-      final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
-      final wsToken = parsed['wsToken']?.toString() ?? '';
-      if (wsToken.isEmpty) {
-        throw Exception('Missing wsToken from /api/incidents response');
-      }
-
-      await _ws.connect(wsToken, incidentId);
-      if (!mounted) return;
-      _ws.sendSOSInit(
-        SOSInitPayload({
-          'incidentId': incidentId,
-          'guestId': profile.guestId,
-          'guestName': profile.guestName,
-          'guestLanguage': profile.language,
-          'hotelId': profile.hotelId,
-          'roomNumber': profile.roomNumber,
-          'floor': 0,
-          'wing': '',
-          'lat': lat,
-          'lng': lng,
-          'deviceInfo': {
-            'platform': kIsWeb ? 'android' : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android'),
-            'osVersion': kIsWeb ? 'web' : '',
-          }
-        }),
-      );
-
-      _startLiveMetadataUpdates(incidentId);
-      if (!mounted) return;
-      state = state.copyWith(status: SOSStatus.active, incidentId: incidentId);
+      await _submitIncident(createReq, idToken, incidentId, lat, lng, profile);
+    } on SocketException catch (_) {
+      // Network unavailable - queue for retry
+      await _handleNetworkFailure(createReq);
     } catch (error) {
-      if (!mounted) return;
-      state = state.copyWith(status: SOSStatus.error, error: error.toString());
+      // Check if it's a connectivity issue
+      final connectivity = await Connectivity().checkConnectivity();
+      final isNone = connectivity.any((c) => c == ConnectivityResult.none);
+      if (isNone ||
+          error.toString().contains('Socket') ||
+          error.toString().contains('connection') ||
+          error.toString().contains('network')) {
+        await _handleNetworkFailure(createReq);
+      } else {
+        if (!mounted) return;
+        state =
+            state.copyWith(status: SOSStatus.error, error: error.toString());
+      }
     }
+  }
+
+  /// Submit incident to backend API.
+  /// Throws exception on failure.
+  Future<void> _submitIncident(
+    Map<String, dynamic> createReq,
+    String? idToken,
+    String incidentId,
+    double? lat,
+    double? lng,
+    GuestProfile profile,
+  ) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/api/incidents');
+    final resp = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${idToken ?? ""}',
+      },
+      body: jsonEncode(createReq),
+    );
+
+    if (resp.statusCode != 201) {
+      var message = 'Failed to create incident';
+      try {
+        final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
+        if (parsed['error'] != null) {
+          message = parsed['error'].toString();
+        }
+      } catch (_) {}
+      throw Exception(message);
+    }
+
+    final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
+    final wsToken = parsed['wsToken']?.toString() ?? '';
+    if (wsToken.isEmpty) {
+      throw Exception('Missing wsToken from /api/incidents response');
+    }
+
+    await _ws.connect(wsToken, incidentId);
+    if (!mounted) return;
+    _ws.sendSOSInit(
+      SOSInitPayload({
+        'incidentId': incidentId,
+        'guestId': profile.guestId,
+        'guestName': profile.guestName,
+        'guestLanguage': profile.language,
+        'hotelId': profile.hotelId,
+        'roomNumber': profile.roomNumber,
+        'floor': 0,
+        'wing': '',
+        'lat': lat,
+        'lng': lng,
+        'deviceInfo': {
+          'platform': kIsWeb
+              ? 'android'
+              : (defaultTargetPlatform == TargetPlatform.iOS
+                  ? 'ios'
+                  : 'android'),
+          'osVersion': kIsWeb ? 'web' : '',
+        }
+      }),
+    );
+
+    _startLiveMetadataUpdates(incidentId);
+    if (!mounted) return;
+    state = state.copyWith(status: SOSStatus.active, incidentId: incidentId);
+  }
+
+  /// Handle network failure by queuing the SOS payload and starting retry listener.
+  Future<void> _handleNetworkFailure(Map<String, dynamic> payload) async {
+    if (!mounted) return;
+
+    // Enqueue the payload for later retry
+    await SOSQueueService.enqueue(payload);
+
+    // Update state to queued
+    state = state.copyWith(
+      status: SOSStatus.queued,
+      error: null,
+    );
+
+    // Start listening for connectivity changes
+    _startConnectivityRetry();
+  }
+
+  /// Listen for connectivity changes and retry pending SOS when network returns.
+  void _startConnectivityRetry() {
+    _connectivitySub?.cancel();
+    _connectivitySub =
+        Connectivity().onConnectivityChanged.listen((results) async {
+      final hasConnection = results.any((r) => r != ConnectivityResult.none);
+      if (hasConnection) {
+        // Network is back - try to submit pending SOS
+        final pending = await SOSQueueService.peek();
+        if (pending != null && mounted) {
+          // Reset to initiating state for retry
+          state = state.copyWith(status: SOSStatus.initiating, error: null);
+
+          try {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              final idToken = await user.getIdToken(true);
+              await _submitIncident(
+                pending,
+                idToken,
+                pending['incidentId'] as String,
+                pending['lat'] as double?,
+                pending['lng'] as double?,
+                _ref.read(guestProfileProvider)!,
+              );
+              // Success - dequeue and stop listening
+              await SOSQueueService.dequeue();
+              _connectivitySub?.cancel();
+            }
+          } catch (error) {
+            // Still failing - stay in queued state
+            state = state.copyWith(
+                status: SOSStatus.queued, error: error.toString());
+          }
+        }
+      }
+    });
   }
 
   Future<void> endSOS(String reason) async {
@@ -220,11 +318,14 @@ class SOSNotifier extends StateNotifier<SOSState> {
 
     if (type == 'AI_STATUS') {
       if (!mounted) return;
+      final etaMin = payload['estimatedArrivalMin'];
       state = current.copyWith(
         status: SOSStatus.active,
         aiMessage: payload['message']?.toString(),
         severity: payload['severity']?.toString(),
         helpOnWay: payload['helpOnWay'] == true,
+        etaMinutes:
+            etaMin is int ? etaMin : (etaMin is num ? etaMin.toInt() : null),
       );
       return;
     }
@@ -244,8 +345,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
     if (type == 'WS_ERROR') {
       if (!mounted) return;
       state = current.copyWith(
-        status: SOSStatus.error,
-        error: payload['message']?.toString());
+          status: SOSStatus.error, error: payload['message']?.toString());
       return;
     }
   }
@@ -254,6 +354,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
   void dispose() {
     _ignoringIncomingMessages = true;
     _sub?.cancel();
+    _connectivitySub?.cancel();
     _locationTimer?.cancel();
     _pingTimer?.cancel();
     unawaited(_ws.disconnect());

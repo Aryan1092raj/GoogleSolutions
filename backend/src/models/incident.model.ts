@@ -39,51 +39,54 @@ export interface ActionHistoryEntry {
   detail: string;
 }
  
-export interface Incident { 
-  incidentId: string; 
-  status: IncidentStatus; 
-  createdAt: unknown; 
-  updatedAt: unknown; 
-  resolvedAt?: unknown; 
-  guestId: string; 
-  guestName: string; 
-  guestPhone?: string; 
-  guestLanguage: string; 
-  roomNumber: string; 
-  hotelId: string; 
-  location: IncidentLocation; 
-  hazards: Hazard[]; 
-  severity: IncidentSeverity; 
+export interface Incident {
+  incidentId: string;
+  status: IncidentStatus;
+  createdAt: unknown;
+  updatedAt: unknown;
+  resolvedAt?: unknown;
+  guestId: string;
+  guestName: string;
+  guestPhone?: string;
+  guestLanguage: string;
+  roomNumber: string;
+  hotelId: string;
+  location: IncidentLocation;
+  hazards: Hazard[];
+  severity: IncidentSeverity;
   aiStatus: AiStatus;
-  aiSummary: string; 
-  translatedTranscript: string; 
-  originalTranscript: string; 
-  detectedLanguage: string; 
-  streamSessionId: string; 
-  isStreamLive: boolean; 
-  recordingGcsPath?: string; 
-  acknowledgedBy?: string; 
-  responderLog: ResponderLogEntry[]; 
+  aiSummary: string;
+  translatedTranscript: string;
+  originalTranscript: string;
+  detectedLanguage: string;
+  streamSessionId: string;
+  isStreamLive: boolean;
+  recordingGcsPath?: string;
+  acknowledgedBy?: string;
+  etaMinutes?: number;
+  etaSetAt?: string;
+  responderLog: ResponderLogEntry[];
   actionHistory: ActionHistoryEntry[];
 }
- 
-export interface LiveIncidentCard { 
-  incidentId: string; 
-  status: string; 
-  severity: string; 
-  roomNumber: string; 
-  floor: number; 
-  wing: string; 
-  guestName: string; 
-  primaryHazard: string; 
+
+export interface LiveIncidentCard {
+  incidentId: string;
+  status: string;
+  severity: string;
+  roomNumber: string;
+  floor: number;
+  wing: string;
+  guestName: string;
+  primaryHazard: string;
   aiStatus: AiStatus;
-  aiSummary: string; 
-  lastUpdatedMs: number; 
-  isStreamLive: boolean; 
-  acknowledgedBy?: string; 
-} 
- 
-export interface StaffOnlineMember { 
+  aiSummary: string;
+  lastUpdatedMs: number;
+  isStreamLive: boolean;
+  acknowledgedBy?: string;
+  etaMinutes?: number;
+}
+
+export interface StaffOnlineMember {
   name: string; 
   fcmToken: string; 
   lastSeenMs: number; 

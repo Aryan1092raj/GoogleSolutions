@@ -1,35 +1,202 @@
-# OS / Editor
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.swp
-*.swo
+# ═══════════════════════════════════════════════════════════
+# ResQLink .gitignore
+# Comprehensive exclusion of confidential & unnecessary files
+# ═══════════════════════════════════════════════════════════
 
-# Logs / Runtime
-*.log
-*.out
-*.err
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-firebase-debug*.log
-firestore-debug*.log
-
-# Secrets / Env
+# ═══════════════════════════════════════════════════════════
+# SECRETS & CREDENTIALS (CRITICAL - NEVER COMMIT)
+# ═══════════════════════════════════════════════════════════
 .env
 .env.*
 !.env.example
 !.env.*.example
+.env.local
+.env.development
+.env.production
+.env.test
+
+# API Keys & Tokens
 *.pem
 *.key
 *.p12
+*.pfx
 *.jks
-*serviceAccount*.json
-firebase-service-account*.json
+*.keystore
+*secret*
+*credential*
+*token*
 
-# Python
+# Service Account Keys
+*serviceAccount*.json
+*service-account*.json
+firebase-service-account*.json
+gcp-sa-key.json
+*-sa-key.json
+*-key.json
+google-*.json
+GoogleService-Info.plist
+google-services.json
+
+# Cloud Config
+firebase-config.js
+firebase-options.dart
+firebase_options.dart
+credentials.json
+secrets.json
+keys.json
+config.secrets.json
+
+# SSH & GCP
+.ssh/
+.gcloud/
+application_default_credentials.json
+gcloud_*.json
+
+# ═══════════════════════════════════════════════════════════
+# OS / EDITOR / IDE
+# ═══════════════════════════════════════════════════════════
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+!.vscode/cspell.json
+!.vscode/settings.json
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse / Spring Tool Suite
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+.*.swp
+.spacemacs
+.emacs.desktop
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ═══════════════════════════════════════════════════════════
+# BUILD ARTIFACTS & DEPENDENCIES
+# ═══════════════════════════════════════════════════════════
+# Node.js / TypeScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+.turbo/
+*.tsbuildinfo
+.eslintcache
+.nyc_output/
+coverage/
+.nyc_output/
+
+# Backend specific
+backend/node_modules/
+backend/dist/
+backend/coverage/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.metadata
+.pub/
+.pub-cache/
+.pub-workspace/
+build/
+.web_build/
+*.lock
+
+# Flutter platform artifacts
+android/.gradle/
+android/captures/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/gradle-app.setting
+android/gradlew
+android/gradlew.bat
+android/local.properties
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.xcframework
+ios/Runner/GeneratedPluginRegistrant.*
+macos/Pods/
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+linux/flutter/generated_plugin_registrant.cc
+linux/flutter/generated_plugin_registrant.h
+windows/flutter/ephemeral/
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+
+# ═══════════════════════════════════════════════════════════
+# LOGS & TEMP FILES
+# ═══════════════════════════════════════════════════════════
+# Logs
+*.log
+*.out
+*.err
+firebase-debug*.log
+firestore-debug*.log
+ui-debug.log
+*.log.*
+logs/
+log/
+
+# Temp files
+tmp*.txt
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+.cache/
 __pycache__/
 *.py[cod]
 *.pyo
@@ -39,80 +206,89 @@ env/
 .pytest_cache/
 .mypy_cache/
 
-# Node / TypeScript
-node_modules/
-dist/
-coverage/
-*.tsbuildinfo
-.npm/
-.pnpm-store/
-.turbo/
-.cache/
-.eslintcache
-
-# Backend specific
-backend/node_modules/
-backend/dist/
-backend/.env
-backend/*.log
-
-# Flutter / Dart
-.dart_tool/
-.packages
-.flutter-plugins
-.flutter-plugins-dependencies
-.metadata
-.pub/
-.pub-cache/
-build/
-.web_build/
-**/doc/api/
-**/coverage/
-
-# Flutter platform generated artifacts
-android/.gradle/
-android/app/debug/
-android/app/profile/
-android/app/release/
-ios/Pods/
-ios/.symlinks/
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
-ios/Flutter/Generated.xcconfig
-ios/Flutter/ephemeral/
-macos/Pods/
-linux/flutter/ephemeral/
-windows/flutter/ephemeral/
-
-# Firebase / local emulator state
+# ═══════════════════════════════════════════════════════════
+# FIREBASE & FIRESTORE
+# ═══════════════════════════════════════════════════════════
 .firebase/
+firestore.rules.backup
+database.rules.json.backup
+firebase.json.backup
 
-# Firebase generated app config (do not commit secrets)
-dashboard/lib/firebase_options.dart
-mobile/lib/firebase_options.dart
-resqlink/lib/firebase_options.dart
-backend/gcp-sa-key.json
-mobile/android/app/google-services.json
-mobile/ios/Runner/GoogleService-Info.plist
-dashboard/web/firebase-config.js
-resqlink/android/app/google-services.json
-resqlink/ios/Runner/GoogleService-Info.plist
-resqlink/web/firebase-config.js
-backend/android-studio-panda2-windows.exe
-
-# Local tooling / AI workspace state
-.git/
+# ═══════════════════════════════════════════════════════════
+# AI / AUTOMATION TOOLING
+# ═══════════════════════════════════════════════════════════
 .agent/
 .gemini/
 .gsd/
 .opencode/
+.qwen/
+.cursor/
+.claude/
+*.cursorrules
+.claudeignore
 
-# Ignore markdown docs except README files
+# ═══════════════════════════════════════════════════════════
+# DOCUMENTATION (Keep README)
+# ═══════════════════════════════════════════════════════════
 *.md
 **/*.md
 !README.md
 !**/README.md
+!CHANGELOG.md
+!CONTRIBUTING.md
+!LICENSE
+!LICENSE.md
 
-# Workspace temp files
-tmp*.txt
-x.hash
+# ═══════════════════════════════════════════════════════════
+# TEST FILES (Optional - uncomment if needed)
+# ═══════════════════════════════════════════════════════════
+# *.test.ts
+# *.spec.ts
+# *_test.dart
+# *.test.js
+# *.test.jsx
+# __tests__/
+# test/
+# tests/
+
+# ═══════════════════════════════════════════════════════════
+# MISCELLANEOUS
+# ═══════════════════════════════════════════════════════════
+# Docker (optional)
+docker-compose.override.yml
+.docker/
+
+# Database
+*.sql
+*.sqlite
+*.db
+*.db-shm
+*.db-wal
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Executables
+*.exe
+
+# Screenshots & Images (optional)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.ico
+*.svg
+!**/logo.*
+!**/icon.*
+
+# Misc
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

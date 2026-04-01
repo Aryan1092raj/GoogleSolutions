@@ -13,6 +13,7 @@ import 'core/dashboard_theme.dart';
 import 'features/auth/screens/staff_login_screen.dart';
 import 'features/command/screens/command_center_screen.dart';
 import 'features/command/screens/incident_detail_screen.dart';
+import 'features/command/screens/qr_generator_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,8 +34,7 @@ void _configureFirestore() {
   firestore.settings = firestore.settings.copyWith(
     webExperimentalForceLongPolling: true,
     webExperimentalAutoDetectLongPolling: false,
-    webExperimentalLongPollingOptions:
-        const WebExperimentalLongPollingOptions(
+    webExperimentalLongPollingOptions: const WebExperimentalLongPollingOptions(
       timeoutDuration: Duration(seconds: 20),
     ),
   );
@@ -57,8 +57,12 @@ final dashboardRouter = GoRouter(
     ),
     GoRoute(
       path: '/incident/:id',
-      builder: (_, state) => IncidentDetailScreen(
-        incidentId: state.pathParameters['id'] ?? ''),
+      builder: (_, state) =>
+          IncidentDetailScreen(incidentId: state.pathParameters['id'] ?? ''),
+    ),
+    GoRoute(
+      path: '/qr-generator',
+      builder: (_, __) => const QrGeneratorScreen(),
     ),
   ],
 );
@@ -72,7 +76,7 @@ class DashboardApp extends StatelessWidget {
       title: 'ResQLink Dashboard',
       debugShowCheckedModeBanner: false,
       routerConfig: dashboardRouter,
-      theme: buildDashboardTheme(),   // ← new polished theme
+      theme: buildDashboardTheme(), // ← new polished theme
     );
   }
 }

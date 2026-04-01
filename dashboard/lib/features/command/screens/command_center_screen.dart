@@ -4,13 +4,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/dashboard_theme.dart';
 import '../providers/incident_provider.dart';
 import '../widgets/live_feed_tile.dart';
 import '../widgets/responder_log.dart';
 import '../widgets/transcript_panel.dart';
 import '../widgets/action_controls.dart';
 import '../widgets/command_chat_panel.dart';
-import '../../../../core/dashboard_theme.dart';
 import '../../../../core/severity_colors.dart' as severity_utils;
 
 class CommandCenterScreen extends ConsumerStatefulWidget {
@@ -88,6 +89,7 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
                     : profile.hotelId.toUpperCase(),
                 role: profile.role.isEmpty ? 'STAFF' : profile.role,
                 activeCount: cards.length,
+                onStaffLogin: () => _showStaffLoginDialog(context),
               ),
               Expanded(
                 child: Row(
@@ -108,13 +110,15 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
                           Expanded(
                             flex: 4,
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                  16, 16, 16, 10),
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 16, 16, 10),
                               child: LiveFeedTile(
-                                hazard:
-                                    selected == null ? 'UNKNOWN' : selected.primaryHazard.toString(),
-                                summary:
-                                    selected == null ? '' : selected.aiSummary.toString(),
+                                hazard: selected == null
+                                    ? 'UNKNOWN'
+                                    : selected.primaryHazard.toString(),
+                                summary: selected == null
+                                    ? ''
+                                    : selected.aiSummary.toString(),
                                 incidentId: selected?.incidentId,
                                 aiStatus: selected?.aiStatus,
                               ),
@@ -185,6 +189,13 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
       ),
     );
   }
+
+  void _showStaffLoginDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => const _StaffLoginDialog(),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -194,11 +205,13 @@ class _Header extends StatelessWidget {
   final String hotel;
   final String role;
   final int activeCount;
+  final VoidCallback onStaffLogin;
 
   const _Header({
     required this.hotel,
     required this.role,
     required this.activeCount,
+    required this.onStaffLogin,
   });
 
   @override
@@ -269,6 +282,22 @@ class _Header extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           _StatusChip(label: role, color: kDashInfo),
+          const SizedBox(width: 12),
+          // QR Codes button
+          IconButton(
+            icon: const Icon(Icons.qr_code_2, size: 20, color: kDashText),
+            tooltip: 'QR Codes',
+            onPressed: () {
+              Navigator.of(context).pushNamed('/qr-generator');
+            },
+          ),
+          // Staff Login button
+          IconButton(
+            icon: const Icon(Icons.person_add_outlined,
+                size: 20, color: kDashText),
+            tooltip: 'Staff Login',
+            onPressed: onStaffLogin,
+          ),
           const Spacer(),
           // Online indicator
           Row(
@@ -448,6 +477,11 @@ class _IncidentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final sevColor = severity_utils.severityColor(card.severity);
 
+    // Check if incident is unacknowledged for more than 3 minutes
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final ageMs = now - card.lastUpdatedMs;
+    final isUnacknowledged = card.status == 'ACTIVE' && ageMs > 3 * 60 * 1000;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -455,9 +489,7 @@ class _IncidentTile extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected
-              ? const Color(0x1AFFFFFF)
-              : const Color(0x0FFFFFFF),
+          color: selected ? const Color(0x1AFFFFFF) : const Color(0x0FFFFFFF),
           borderRadius: BorderRadius.circular(14),
           border: selected
               ? Border.all(
@@ -569,6 +601,11 @@ class _IncidentTile extends StatelessWidget {
                         ),
                     ],
                   ),
+                  // Unacknowledged warning indicator
+                  if (isUnacknowledged) ...[
+                    const SizedBox(height: 8),
+                    const _UnacknowledgedBadge(),
+                  ],
                 ],
               ),
             ),
@@ -610,6 +647,77 @@ class _IncidentTile extends StatelessWidget {
       default:
         return kDashTextSub;
     }
+  }
+}
+
+// Pulsing badge for unacknowledged incidents
+class _UnacknowledgedBadge extends StatefulWidget {
+  const _UnacknowledgedBadge();
+
+  @override
+  State<_UnacknowledgedBadge> createState() => _UnacknowledgedBadgeState();
+}
+
+class _UnacknowledgedBadgeState extends State<_UnacknowledgedBadge>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: true);
+    _opacityAnimation =
+        Tween<double>(begin: 1.0, end: 0.3).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: kDashWarning.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: kDashWarning.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: kDashWarning.withValues(
+                    alpha: 0.6 + _opacityAnimation.value * 0.4),
+                size: 14,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'UNACKNOWLEDGED — ESCALATING',
+                style: GoogleFonts.inter(
+                  color: kDashWarning,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -753,8 +861,7 @@ class _AiAnalysisPanelState extends State<_AiAnalysisPanel> {
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0x0DFFFFFF),
                   borderRadius: BorderRadius.circular(4),
@@ -791,7 +898,8 @@ class _AiAnalysisPanelState extends State<_AiAnalysisPanel> {
               border: Border.all(color: kDashBorder),
             ),
             child: Text(
-              _summaryForState(widget.incident.aiStatus, widget.incident.aiSummary),
+              _summaryForState(
+                  widget.incident.aiStatus, widget.incident.aiSummary),
               style: GoogleFonts.inter(
                 color: widget.incident.aiStatus == 'AVAILABLE' &&
                         widget.incident.aiSummary.isNotEmpty
@@ -811,7 +919,8 @@ class _AiAnalysisPanelState extends State<_AiAnalysisPanel> {
                 height: 7,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: widget.incident.isStreamLive ? kDashDanger : kDashTextSub,
+                  color:
+                      widget.incident.isStreamLive ? kDashDanger : kDashTextSub,
                 ),
               ),
               const SizedBox(width: 6),
@@ -886,5 +995,211 @@ class _AiAnalysisPanelState extends State<_AiAnalysisPanel> {
       default:
         return 'Awaiting AI analysis...';
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Staff Login Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+class _StaffLoginDialog extends ConsumerStatefulWidget {
+  const _StaffLoginDialog();
+
+  @override
+  ConsumerState<_StaffLoginDialog> createState() => _StaffLoginDialogState();
+}
+
+class _StaffLoginDialogState extends ConsumerState<_StaffLoginDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _loading = true);
+
+    try {
+      final email = _emailCtrl.text.trim();
+      final password = _passwordCtrl.text;
+
+      final credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+
+      final profile = StaffProfile(
+        uid: credential.user!.uid,
+        hotelId: '',
+        role: 'STAFF',
+      );
+
+      ref.read(staffProfileProvider.notifier).state = profile;
+      await markStaffOnline(profile, name: email);
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Staff login successful'),
+            backgroundColor: kDashGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text('Login failed: ${e.toString()}')),
+              ],
+            ),
+            backgroundColor: kDashDanger,
+            behavior: SnackBarBehavior.floating,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: kDashBg,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16))),
+      title: const Row(
+        children: [
+          Icon(Icons.person_add_outlined, color: kDashAccent, size: 24),
+          SizedBox(width: 12),
+          Text(
+            'Staff Login',
+            style: TextStyle(
+                color: kDashText, fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _emailCtrl,
+              style: const TextStyle(color: kDashText),
+              decoration: InputDecoration(
+                labelText: 'Email',
+                labelStyle: const TextStyle(color: kDashTextSub),
+                prefixIcon: const Icon(Icons.email_outlined,
+                    color: kDashTextSub, size: 20),
+                filled: true,
+                fillColor: const Color(0x0DFFFFFF),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: kDashBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: kDashAccent, width: 1.5),
+                ),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty || !v.contains('@'))
+                      ? 'Please enter a valid email'
+                      : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _passwordCtrl,
+              style: const TextStyle(color: kDashText),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                labelStyle: const TextStyle(color: kDashTextSub),
+                prefixIcon: const Icon(Icons.lock_outlined,
+                    color: kDashTextSub, size: 20),
+                filled: true,
+                fillColor: const Color(0x0DFFFFFF),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: kDashBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: kDashAccent, width: 1.5),
+                ),
+              ),
+              obscureText: true,
+              validator: (v) => (v == null || v.length < 6)
+                  ? 'Password must be at least 6 characters'
+                  : null,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            foregroundColor: kDashTextSub,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _loading ? null : _login,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kDashAccent,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: _loading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Login'),
+                    SizedBox(width: 8),
+                    Icon(Icons.login, size: 18),
+                  ],
+                ),
+        ),
+      ],
+    );
   }
 }

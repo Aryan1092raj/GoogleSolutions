@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
 type BridgeSession = {
   sendMedia: (chunk: any) => Promise<void>;
   close: () => void;
-  mode: 'GENAI_LIVE' | 'VERTEX_CHAT';
+  mode: 'GENAI_LIVE' | 'VERTEX_CHAT' | 'GEMINI_API';
 };
 
 const geminiSessions = new Map<string, BridgeSession>();
@@ -228,67 +228,64 @@ function tryParseStreamingJson(text: string): { parsed: any } | { error: string 
 }
 
 async function createGenAiLiveSession(incidentId: string, guestLanguage: string): Promise<BridgeSession> {
-  let genAiModule: any;
-  try {
-    genAiModule = await import('@google/genai');
-  } catch (error) {
-    throw new Error(`@google/genai not available: ${String(error)}`);
-  }
+  logger.info('Initializing Gemini with API Key', {
+    incidentId,
+    model: process.env.GEMINI_MODEL,
+    hasApiKey: !!process.env.GEMINI_API_KEY,
+  });
 
-  const GoogleGenAI = genAiModule.GoogleGenAI;
-  if (!GoogleGenAI) {
-    throw new Error('GoogleGenAI export missing');
-  }
-
+  // Use @google/genai with API key (simpler than Vertex AI)
+  const { GoogleGenAI } = await import('@google/genai');
+  
   const ai = new GoogleGenAI({
-    vertexai: true,
-    project: process.env.GOOGLE_CLOUD_PROJECT,
-    location: process.env.VERTEX_AI_LOCATION,
+    apiKey: process.env.GEMINI_API_KEY,
   });
 
-  const liveSession = await ai.live.connect({
-    model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-live-001',
-    config: {
-      responseModalities: ['TEXT'],
-      systemInstruction: buildSystemPrompt(guestLanguage),
-    },
-    callbacks: {
-      onmessage: (message: any) => {
-        void parseGeminiResponse(message, incidentId);
-      },
-      onerror: (error: any) => {
-        logger.error('Gemini Live callback error', { incidentId, error });
-        void recordAiUnavailable(incidentId, error);
-      },
-      onclose: (event: any) => {
-        logger.info('Gemini Live session closed', {
-          incidentId,
-          code: event?.code,
-          reason: event?.reason,
-        });
-      },
-    },
-  });
+  // Start a chat session
+  let chatSession: any = null;
+  const systemPrompt = buildSystemPrompt(guestLanguage);
 
   return {
-    mode: 'GENAI_LIVE',
+    mode: 'GEMINI_API',
     close: () => {
-      liveSession.close();
+      chatSession = null;
     },
     sendMedia: async (chunk: any) => {
-      if (chunk.video) {
-        const videoBlob = new Blob([Buffer.from(chunk.video, 'base64')], {
-          type: chunk.mimeTypeVideo,
+      if (!chatSession) {
+        // Initialize chat on first message
+        chatSession = await ai.chats.create({
+          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
         });
-        liveSession.sendRealtimeInput({ media: videoBlob });
+        // Send system instruction as first message
+        await chatSession.sendMessage([
+          { text: systemPrompt },
+          { text: 'Acknowledged. I will analyze all media and respond with JSON only.' }
+        ]);
       }
 
-      if (chunk.audio) {
-        const audioBlob = new Blob([Buffer.from(chunk.audio, 'base64')], {
-          type: chunk.mimeTypeAudio,
+      const parts: any[] = [];
+      if (chunk.video) {
+        parts.push({
+          inlineData: { data: chunk.video, mimeType: chunk.mimeTypeVideo },
         });
-        liveSession.sendRealtimeInput({ media: audioBlob });
       }
+      if (chunk.audio) {
+        parts.push({
+          inlineData: { data: chunk.audio, mimeType: chunk.mimeTypeAudio },
+        });
+      }
+      if (parts.length === 0) {
+        return;
+      }
+
+      logger.debug('Sending media to Gemini', {
+        incidentId,
+        hasVideo: !!chunk.video,
+        hasAudio: !!chunk.audio,
+      });
+
+      const response = await chatSession.sendMessage(parts);
+      await parseGeminiResponse(response, incidentId);
     },
   };
 }
@@ -344,23 +341,14 @@ export async function openGeminiSession(incidentId: string, guestLanguage: strin
     geminiSessions.set(incidentId, session);
     logger.info('Gemini session opened', { incidentId, mode: session.mode });
     return session;
-  } catch (liveError) {
-    logger.warn('Gemini Live session unavailable, using fallback', {
+  } catch (error) {
+    logger.error('Gemini session failed', {
       incidentId,
-      error: String(liveError),
+      error: String(error),
     });
+    await recordAiUnavailable(incidentId, error);
+    throw error;
   }
-
-  const fallback = await createVertexChatFallbackSession(incidentId, guestLanguage);
-  geminiSessions.set(incidentId, fallback);
-  await firebaseService.updateIncidentAiState(
-    incidentId,
-    'DEGRADED',
-    'AI is running in fallback mode while live analysis reconnects.',
-    'AI switched to fallback analysis mode.',
-  );
-  logger.info('Gemini session opened', { incidentId, mode: fallback.mode });
-  return fallback;
 }
 
 export function closeGeminiSession(incidentId: string) {
@@ -382,10 +370,18 @@ export function closeGeminiSession(incidentId: string) {
 export async function sendMediaToGemini(incidentId: string, chunk: any) {
   const session = geminiSessions.get(incidentId);
   if (!session) {
+    logger.warn('Gemini media send skipped - no session', { incidentId, hasSession: false });
     return;
   }
   try {
+    logger.debug('Sending media to Gemini', {
+      incidentId,
+      hasVideo: !!chunk.video,
+      hasAudio: !!chunk.audio,
+      chunkIndex: chunk.chunkIndex,
+    });
     await session.sendMedia(chunk);
+    logger.debug('Media sent to Gemini successfully', { incidentId, chunkIndex: chunk.chunkIndex });
   } catch (error) {
     logger.error('Gemini media send failed', { incidentId, error });
     await recordAiUnavailable(incidentId, error);
@@ -395,7 +391,15 @@ export async function sendMediaToGemini(incidentId: string, chunk: any) {
 export async function parseGeminiResponse(response: any, incidentId: string) {
   try {
     const rawText = extractTextFromResponse(response);
+    logger.info('Gemini response received', {
+      incidentId,
+      hasText: !!rawText,
+      textLength: rawText?.length ?? 0,
+      rawTextPreview: rawText?.substring(0, 200),
+    });
+    
     if (!rawText) {
+      logger.warn('Gemini response has no text content', { incidentId, responseKeys: Object.keys(response || {}) });
       return;
     }
 
@@ -415,6 +419,7 @@ export async function parseGeminiResponse(response: any, incidentId: string) {
 
     // Store updated buffer
     geminiTextBuffers.set(incidentId, newBuffer);
+    logger.info('Gemini buffer updated', { incidentId, bufferSize: newBuffer.length });
 
     // Try to parse accumulated JSON
     const parseResult = tryParseStreamingJson(newBuffer);
@@ -432,13 +437,32 @@ export async function parseGeminiResponse(response: any, incidentId: string) {
       logger.error('Gemini JSON parse error', {
         incidentId,
         error: parseResult.error,
+        bufferPreview: newBuffer.substring(0, 500),
       });
       geminiTextBuffers.delete(incidentId);
       return;
     }
 
-    // Successfully parsed!
-    const analysis = analysisSchema.parse(parseResult.parsed);
+    // Successfully parsed raw JSON - log it for debugging
+    logger.info('Gemini raw JSON parsed', {
+      incidentId,
+      jsonPreview: JSON.stringify(parseResult.parsed, null, 2).substring(0, 800),
+    });
+
+    // Validate against schema
+    let analysis;
+    try {
+      analysis = analysisSchema.parse(parseResult.parsed);
+    } catch (schemaError) {
+      logger.error('Gemini schema validation failed', {
+        incidentId,
+        parsedData: parseResult.parsed,
+        schemaErrors: schemaError instanceof Error ? schemaError.message : String(schemaError),
+      });
+      geminiTextBuffers.delete(incidentId);
+      return;
+    }
+
     aiFailureRecorded.delete(incidentId);
 
     // Clear buffer on successful parse

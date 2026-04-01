@@ -1,11 +1,12 @@
-import { guestToBackendMessageSchema } from '../models/ws-message.model'; 
-import * as firebaseService from '../services/firebase.service'; 
-import * as fcmService from '../services/fcm.service'; 
-import * as storageService from '../services/storage.service'; 
+import { guestToBackendMessageSchema } from '../models/ws-message.model';
+import * as firebaseService from '../services/firebase.service';
+import * as fcmService from '../services/fcm.service';
+import * as storageService from '../services/storage.service';
 import { getRtdb } from '../config/firebase-admin';
-import { logger } from '../utils/logger'; 
-import { closeGeminiSession, openGeminiSession, sendMediaToGemini } from './gemini-bridge'; 
-import { sendToGuest } from './ws-server'; 
+import { logger } from '../utils/logger';
+import { closeGeminiSession, openGeminiSession, sendMediaToGemini } from './gemini-bridge';
+import { sendToGuest } from './ws-server';
+import { startEscalationTimer, cancelEscalationTimer } from '../services/escalation.service';
  
 const maxChunkBytes = Number(process.env.MAX_MEDIA_CHUNK_BYTES ? process.env.MAX_MEDIA_CHUNK_BYTES : '524288'); 
  
@@ -65,38 +66,42 @@ export async function handleSosMessage(ws, rawMessage, incidentIdFromConnection)
     return; 
   } 
  
-  if (msg.type === 'SOS_INIT') { 
-    const created = await firebaseService.createIncident({ 
-      incidentId: msg.payload.incidentId, 
-      hotelId: msg.payload.hotelId, 
-      roomNumber: msg.payload.roomNumber, 
-      floor: msg.payload.floor, 
-      wing: msg.payload.wing, 
-      guestId: msg.payload.guestId, 
-      guestName: msg.payload.guestName, 
-      guestLanguage: msg.payload.guestLanguage, 
-      lat: msg.payload.lat, 
-      lng: msg.payload.lng, 
-      streamSessionId: msg.payload.incidentId, 
-    }); 
- 
-    const incident = created.incident; 
-    try { 
-      await openGeminiSession(msg.payload.incidentId, msg.payload.guestLanguage); 
-    } catch (error) { 
-      sendWsError(msg.payload.incidentId, 'GEMINI_UNAVAILABLE', 'Gemini session open failed', true); 
-    } 
- 
-    await fcmService.alertAllStaff(msg.payload.hotelId, incident); 
-    sendToGuest(msg.payload.incidentId, { 
-      type: 'SOS_ACCEPTED', 
-      payload: { 
-        incidentId: msg.payload.incidentId, 
-        message: 'SOS received. Help is being dispatched.', 
-      }, 
-    }); 
-    return; 
-  } 
+  if (msg.type === 'SOS_INIT') {
+    const created = await firebaseService.createIncident({
+      incidentId: msg.payload.incidentId,
+      hotelId: msg.payload.hotelId,
+      roomNumber: msg.payload.roomNumber,
+      floor: msg.payload.floor,
+      wing: msg.payload.wing,
+      guestId: msg.payload.guestId,
+      guestName: msg.payload.guestName,
+      guestLanguage: msg.payload.guestLanguage,
+      lat: msg.payload.lat,
+      lng: msg.payload.lng,
+      streamSessionId: msg.payload.incidentId,
+    });
+
+    const incident = created.incident;
+    try {
+      await openGeminiSession(msg.payload.incidentId, msg.payload.guestLanguage);
+    } catch (error) {
+      sendWsError(msg.payload.incidentId, 'GEMINI_UNAVAILABLE', 'Gemini session open failed', true);
+    }
+
+    await fcmService.alertAllStaff(msg.payload.hotelId, incident);
+    
+    // Start escalation timer if not acknowledged within 3 minutes
+    startEscalationTimer(msg.payload.incidentId, msg.payload.hotelId);
+    
+    sendToGuest(msg.payload.incidentId, {
+      type: 'SOS_ACCEPTED',
+      payload: {
+        incidentId: msg.payload.incidentId,
+        message: 'SOS received. Help is being dispatched.',
+      },
+    });
+    return;
+  }
  
   if (msg.type === 'MEDIA_CHUNK') { 
     if (isChunkTooLarge(msg.payload.video)) { 
@@ -108,14 +113,14 @@ export async function handleSosMessage(ws, rawMessage, incidentIdFromConnection)
       return; 
     } 
  
-    await sendMediaToGemini(msg.payload.incidentId, msg.payload); 
-    await storageService.appendMediaChunk(msg.payload.incidentId, msg.payload.chunkIndex, msg.payload.video, msg.payload.audio); 
+    await sendMediaToGemini(msg.payload.incidentId, msg.payload);
+    await storageService.appendMediaChunk(msg.payload.incidentId, msg.payload.chunkIndex, msg.payload.video, msg.payload.audio);
 
-    // Relay latest frame to RTDB so dashboard can display it
-    if (msg.payload.video && msg.payload.chunkIndex % 6 === 0) {
+    // Relay latest frame to RTDB so dashboard can display it (every 2 chunks = ~3fps at 6fps capture)
+    if (msg.payload.video && msg.payload.chunkIndex % 2 === 0) {
       await relayFrameToRtdb(msg.payload.incidentId, msg.payload.video);
     }
-    return; 
+    return;
   }
  
   if (msg.type === 'LOCATION_UPDATE') { 
@@ -123,44 +128,47 @@ export async function handleSosMessage(ws, rawMessage, incidentIdFromConnection)
     return; 
   } 
  
-  if (msg.type === 'SOS_END') { 
-    closeGeminiSession(msg.payload.incidentId); 
- 
-    let finalStatus = 'RESOLVED'; 
-    if (msg.payload.reason === 'FALSE_ALARM') { 
-      finalStatus = 'FALSE_ALARM'; 
-    } 
- 
+  if (msg.type === 'SOS_END') {
+    closeGeminiSession(msg.payload.incidentId);
+    
+    // Cancel escalation timers
+    cancelEscalationTimer(msg.payload.incidentId);
+
+    let finalStatus = 'RESOLVED';
+    if (msg.payload.reason === 'FALSE_ALARM') {
+      finalStatus = 'FALSE_ALARM';
+    }
+
     await firebaseService.updateIncidentStatus(
       msg.payload.incidentId,
       finalStatus,
       null,
       'Guest ended SOS',
       'Guest',
-    ); 
-    const gcsPath = await storageService.finalizeRecording(msg.payload.incidentId); 
- 
-    if (gcsPath) { 
-      await firebaseService.updateIncidentAnalysis(msg.payload.incidentId, { 
-        hazards: [], 
-        severity: 'LOW', 
-        aiSummary: 'Incident recording finalized', 
-        translatedTranscript: '', 
-        originalTranscript: '', 
-        detectedLanguage: 'en', 
-      }); 
-    } 
- 
-    sendToGuest(msg.payload.incidentId, { 
-      type: 'INCIDENT_RESOLVED', 
-      payload: { 
-        incidentId: msg.payload.incidentId, 
-        resolvedBy: 'guest', 
-        message: 'Incident marked as resolved.', 
-      }, 
-    }); 
-    return; 
-  } 
+    );
+    const gcsPath = await storageService.finalizeRecording(msg.payload.incidentId);
+
+    if (gcsPath) {
+      await firebaseService.updateIncidentAnalysis(msg.payload.incidentId, {
+        hazards: [],
+        severity: 'LOW',
+        aiSummary: 'Incident recording finalized',
+        translatedTranscript: '',
+        originalTranscript: '',
+        detectedLanguage: 'en',
+      });
+    }
+
+    sendToGuest(msg.payload.incidentId, {
+      type: 'INCIDENT_RESOLVED',
+      payload: {
+        incidentId: msg.payload.incidentId,
+        resolvedBy: 'guest',
+        message: 'Incident marked as resolved.',
+      },
+    });
+    return;
+  }
  
   if (msg.type === 'WS_PING') { 
     sendToGuest(msg.payload.incidentId, { 

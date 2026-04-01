@@ -1,9 +1,10 @@
-import { Router } from 'express'; 
-import { z } from 'zod'; 
-import * as firebaseService from '../services/firebase.service'; 
-import { issueWsToken } from '../websocket/ws-server'; 
+import { Router } from 'express';
+import { z } from 'zod';
+import * as firebaseService from '../services/firebase.service';
+import { issueWsToken } from '../websocket/ws-server';
 import { sendToGuest } from '../websocket/ws-server';
-import { isGeminiConfigured } from '../services/gemini.service'; 
+import { isGeminiConfigured } from '../services/gemini.service';
+import { cancelEscalationTimer } from '../services/escalation.service';
  
 const createIncidentSchema = z.object({ 
   incidentId: z.string(), 
@@ -18,10 +19,11 @@ const createIncidentSchema = z.object({
   lng: z.number().optional(), 
 }); 
  
-const patchStatusSchema = z.object({ 
-  status: z.enum(['ACKNOWLEDGED', 'RESOLVED', 'FALSE_ALARM']), 
-  note: z.string().optional(), 
-}); 
+const patchStatusSchema = z.object({
+  status: z.enum(['ACKNOWLEDGED', 'RESOLVED', 'FALSE_ALARM']),
+  note: z.string().optional(),
+  etaMinutes: z.number().min(1).max(60).optional(),
+});
  
 const logSchema = z.object({ 
   action: z.string(), 
@@ -105,40 +107,58 @@ incidentRouter.get('/:incidentId', async function (req, res) {
   res.status(200).json(incident); 
 }); 
  
-incidentRouter.patch('/:incidentId/status', async function (req, res) { 
-  const parsed = patchStatusSchema.safeParse(req.body); 
-  if (!parsed.success) { 
-    res.status(400).json({ error: 'Validation failed' }); 
-    return; 
-  } 
- 
-  const requester = getRequester(req); 
-  let staffId = null; 
+incidentRouter.patch('/:incidentId/status', async function (req, res) {
+  const parsed = patchStatusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const requester = getRequester(req);
+  let staffId = null;
   let staffName = 'Staff';
-  if (requester) { 
-    if (requester.uid) { 
-      staffId = requester.uid; 
-    } 
+  if (requester) {
+    if (requester.uid) {
+      staffId = requester.uid;
+    }
     if (requester.email) {
       staffName = String(requester.email);
     } else if (requester.name) {
       staffName = String(requester.name);
     }
-  } 
-  const updated = await firebaseService.updateIncidentStatus(req.params.incidentId, parsed.data.status, staffId, parsed.data.note, staffName); 
-  if (!updated) { 
-    res.status(404).json({ error: 'Not found' }); 
-    return; 
-  } 
+  }
+  
+  // Get incident before update to access severity
+  const incidentBefore = await firebaseService.getIncidentById(req.params.incidentId);
+  const updated = await firebaseService.updateIncidentStatus(req.params.incidentId, parsed.data.status, staffId, parsed.data.note, staffName);
+  if (!updated) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
 
+  // Handle ETA for ACKNOWLEDGED status
   if (parsed.data.status === 'ACKNOWLEDGED') {
+    const etaMinutes = parsed.data.etaMinutes;
+    
+    // Cancel escalation timer since staff has acknowledged
+    cancelEscalationTimer(req.params.incidentId);
+    
+    // Store ETA in Firestore if provided
+    if (etaMinutes !== undefined && etaMinutes !== null) {
+      await firebaseService.updateIncidentEta(req.params.incidentId, etaMinutes);
+    }
+    
+    // Send WS message to guest
     sendToGuest(req.params.incidentId, {
       type: 'AI_STATUS',
       payload: {
         incidentId: req.params.incidentId,
-        message: 'Security has acknowledged your SOS. Stay calm and keep this feed active.',
-        severity: updated.severity || 'LOW',
+        message: etaMinutes 
+          ? `Security has acknowledged your SOS. Estimated arrival: ${etaMinutes} minutes.`
+          : 'Security has acknowledged your SOS. Stay calm and keep this feed active.',
+        severity: updated.severity || incidentBefore?.severity || 'LOW',
         helpOnWay: true,
+        estimatedArrivalMin: etaMinutes,
       },
     });
   }
