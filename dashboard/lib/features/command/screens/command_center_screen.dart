@@ -4,7 +4,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/dashboard_theme.dart';
 import '../providers/incident_provider.dart';
 import '../widgets/live_feed_tile.dart';
@@ -12,6 +14,7 @@ import '../widgets/responder_log.dart';
 import '../widgets/transcript_panel.dart';
 import '../widgets/action_controls.dart';
 import '../widgets/command_chat_panel.dart';
+import '../widgets/incident_map_widget.dart';
 import '../../../../core/severity_colors.dart' as severity_utils;
 
 class CommandCenterScreen extends ConsumerStatefulWidget {
@@ -90,6 +93,10 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
                 role: profile.role.isEmpty ? 'STAFF' : profile.role,
                 activeCount: cards.length,
                 onStaffLogin: () => _showStaffLoginDialog(context),
+                onHistory: () => context.go('/incident-history'),
+                onOpenCurrent: selected == null
+                    ? null
+                    : () => context.go('/incident/${selected.incidentId}'),
               ),
               Expanded(
                 child: Row(
@@ -105,37 +112,43 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
                     ),
                     Expanded(
                       flex: 6,
-                      child: Column(
-                        children: [
-                          Expanded(
-                            flex: 4,
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 16, 16, 10),
-                              child: LiveFeedTile(
-                                hazard: selected == null
-                                    ? 'UNKNOWN'
-                                    : selected.primaryHazard.toString(),
-                                summary: selected == null
-                                    ? ''
-                                    : selected.aiSummary.toString(),
-                                incidentId: selected?.incidentId,
-                                aiStatus: selected?.aiStatus,
-                              ),
+                      child: selected == null
+                          ? const _HomeSosOverview()
+                          : Column(
+                              children: [
+                                Expanded(
+                                  flex: 4,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 16, 16, 10),
+                                    child: LiveFeedTile(
+                                      hazard: selected.primaryHazard.toString(),
+                                      summary: selected.aiSummary.toString(),
+                                      incidentId: selected.incidentId,
+                                      aiStatus: selected.aiStatus,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 10, 16, 16),
+                                    child: TranscriptPanel(
+                                      incidentId: selected.incidentId,
+                                    ),
+                                  ),
+                                ),
+                                Container(height: 1, color: kDashBorder),
+                                SizedBox(
+                                  height: 200,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: _buildMapPanel(selected),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                              child: TranscriptPanel(
-                                incidentId: selected?.incidentId ?? '-',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                     Container(
                       width: 1,
@@ -196,6 +209,27 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
       builder: (_) => const _StaffLoginDialog(),
     );
   }
+
+  Widget _buildMapPanel(LiveIncidentCard card) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('incidents')
+          .doc(card.incidentId)
+          .snapshots(),
+      builder: (context, snap) {
+        final data = snap.data?.data() as Map<String, dynamic>?;
+        final location = data?['location'] as Map<String, dynamic>?;
+        final lat = (location?['lat'] as num?)?.toDouble();
+        final lng = (location?['lng'] as num?)?.toDouble();
+        return IncidentMapWidget(
+          lat: lat,
+          lng: lng,
+          roomNumber: card.roomNumber,
+          severity: card.severity,
+        );
+      },
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -206,12 +240,16 @@ class _Header extends StatelessWidget {
   final String role;
   final int activeCount;
   final VoidCallback onStaffLogin;
+  final VoidCallback onHistory;
+  final VoidCallback? onOpenCurrent;
 
   const _Header({
     required this.hotel,
     required this.role,
     required this.activeCount,
     required this.onStaffLogin,
+    required this.onHistory,
+    required this.onOpenCurrent,
   });
 
   @override
@@ -283,12 +321,22 @@ class _Header extends StatelessWidget {
           const SizedBox(width: 8),
           _StatusChip(label: role, color: kDashInfo),
           const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(Icons.history, size: 20, color: kDashText),
+            tooltip: 'Incident History',
+            onPressed: onHistory,
+          ),
+          IconButton(
+            icon: const Icon(Icons.open_in_new, size: 20, color: kDashText),
+            tooltip: 'Open Incident Detail',
+            onPressed: onOpenCurrent,
+          ),
           // QR Codes button
           IconButton(
             icon: const Icon(Icons.qr_code_2, size: 20, color: kDashText),
             tooltip: 'QR Codes',
             onPressed: () {
-              Navigator.of(context).pushNamed('/qr-generator');
+              context.go('/qr-generator');
             },
           ),
           // Staff Login button
@@ -370,6 +418,204 @@ class _StatusChip extends StatelessWidget {
               color: color,
               fontSize: 11,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeSosOverview extends StatelessWidget {
+  const _HomeSosOverview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Container(
+        decoration: glassSurfaceDecoration,
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: kDashBorder),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: kDashGreen,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'System Status: Active',
+                    style: GoogleFonts.inter(
+                      color: kDashText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Monitoring location and safety triggers',
+                    style: GoogleFonts.inter(
+                      color: kDashTextSub,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 220,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: kDashAccent.withValues(alpha: 0.4),
+                          width: 4,
+                        ),
+                        gradient: RadialGradient(
+                          colors: [
+                            kDashAccent.withValues(alpha: 0.25),
+                            kDashAccent.withValues(alpha: 0.08),
+                          ],
+                        ),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 156,
+                          height: 156,
+                          decoration: BoxDecoration(
+                            color: kDashAccent,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: kDashAccent.withValues(alpha: 0.32),
+                                blurRadius: 28,
+                                offset: const Offset(0, 12),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'SOS',
+                                style: GoogleFonts.fustat(
+                                  color: Colors.white,
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              Text(
+                                'Hold to activate',
+                                style: GoogleFonts.inter(
+                                  color: Colors.white.withValues(alpha: 0.88),
+                                  fontSize: 10,
+                                  letterSpacing: 1.2,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    const Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        _OverviewChip(
+                          icon: Icons.shield_outlined,
+                          title: 'Safe Check',
+                          subtitle: 'Auto-call in 15m',
+                        ),
+                        _OverviewChip(
+                          icon: Icons.location_on_outlined,
+                          title: 'Share Location',
+                          subtitle: '3 active watchers',
+                        ),
+                        _OverviewChip(
+                          icon: Icons.call_outlined,
+                          title: 'Emergency Contacts',
+                          subtitle: 'Family and authorities',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OverviewChip extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _OverviewChip({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 186,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0x0DFFFFFF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kDashBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: kDashAccent, size: 16),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: kDashText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    color: kDashTextSub,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1029,17 +1275,25 @@ class _StaffLoginDialogState extends ConsumerState<_StaffLoginDialog> {
     try {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text;
+      final current = ref.read(staffProfileProvider);
 
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
 
+      final token = await credential.user?.getIdTokenResult(true);
+      final claims = token?.claims;
+      final hotelId = (claims?['hotelId'] as String?) ?? current.hotelId;
+      final role = (claims?['role'] as String?) ??
+          (current.role.isEmpty ? 'STAFF' : current.role);
+
       final profile = StaffProfile(
         uid: credential.user!.uid,
-        hotelId: '',
-        role: 'STAFF',
+        hotelId: hotelId,
+        role: role,
       );
 
       ref.read(staffProfileProvider.notifier).state = profile;
+      await syncStaffAccessProfile(profile, email: email);
       await markStaffOnline(profile, name: email);
 
       if (mounted) {

@@ -209,7 +209,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Staff Portal',
+                      'Precision safety for your stay.',
                       style: GoogleFonts.inter(
                         color: kDashTextSub,
                         fontSize: 14,
@@ -247,12 +247,10 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
                       style: GoogleFonts.inter(color: kDashText),
-                      onSubmitted: (_) =>
-                          FocusScope.of(context).nextFocus(),
+                      onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Email address',
-                        prefixIcon:
-                            Icon(Icons.alternate_email, size: 18),
+                        prefixIcon: Icon(Icons.alternate_email, size: 18),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -274,8 +272,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                             size: 18,
                             color: kDashTextSub,
                           ),
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
                     ),
@@ -304,8 +301,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                         child: ElevatedButton(
                           onPressed: _loading ? null : _login,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                kDashAccent.withValues(alpha: 0.8),
+                            backgroundColor: kDashAccent.withValues(alpha: 0.8),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                               vertical: 16,
@@ -350,7 +346,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Secured by Firebase Auth',
+                          'ResQLink onboarding secured by Firebase Auth',
                           style: GoogleFonts.inter(
                             color: kDashTextMut,
                             fontSize: 11,

@@ -50,8 +50,25 @@ app.use(async function (req, res, next) {
 });
  
 app.use('/health', healthRouter); 
-app.use('/api/auth', authRouter); 
-app.use('/api/incidents', incidentRouter); 
+app.use('/api/auth', authRouter);
+app.use('/api/incidents', incidentRouter);
+
+// App Check verification for incident creation (blocks fake SOS)
+app.use('/api/incidents', async function (req, res, next) {
+  if (req.method !== 'POST') { next(); return; }
+  const appCheckToken = req.headers['x-firebase-appcheck'];
+  if (!appCheckToken || typeof appCheckToken !== 'string') {
+    res.status(401).json({ error: 'App Check token missing' });
+    return;
+  }
+  try {
+    await getFirebaseApp().appCheck().verifyToken(appCheckToken);
+    next();
+  } catch (error) {
+    logger.warn('App Check verification failed', { error });
+    res.status(401).json({ error: 'App Check verification failed' });
+  }
+});
  
 const server = http.createServer(app); 
 createWsServer(server); 

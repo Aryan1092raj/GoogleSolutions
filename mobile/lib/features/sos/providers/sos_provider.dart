@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 import '../../../core/constants.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -179,12 +180,18 @@ class SOSNotifier extends StateNotifier<SOSState> {
     double? lng,
     GuestProfile profile,
   ) async {
+    String appCheckToken = '';
+    try {
+      appCheckToken = await FirebaseAppCheck.instance.getToken() ?? '';
+    } catch (_) {}
+
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/api/incidents');
     final resp = await http.post(
       uri,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${idToken ?? ""}',
+        'X-Firebase-AppCheck': appCheckToken,
       },
       body: jsonEncode(createReq),
     );

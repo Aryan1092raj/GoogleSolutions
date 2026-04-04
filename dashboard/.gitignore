@@ -54,3 +54,7 @@ ios/Runner/GoogleService-Info.plist
 .dart_tool/
 build/
 .web_build/
+
+# Environment secrets (NEVER commit)
+.env.local
+.env.*.local

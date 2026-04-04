@@ -191,6 +191,8 @@ log/
 tmp*.txt
 tmp/
 temp/
+.tmp_stitch/
+stitch_exports/
 *.tmp
 *.temp
 *.bak

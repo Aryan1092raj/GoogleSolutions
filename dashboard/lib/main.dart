@@ -13,6 +13,7 @@ import 'core/dashboard_theme.dart';
 import 'features/auth/screens/staff_login_screen.dart';
 import 'features/command/screens/command_center_screen.dart';
 import 'features/command/screens/incident_detail_screen.dart';
+import 'features/command/screens/incident_history_screen.dart';
 import 'features/command/screens/qr_generator_screen.dart';
 
 Future<void> main() async {
@@ -59,6 +60,10 @@ final dashboardRouter = GoRouter(
       path: '/incident/:id',
       builder: (_, state) =>
           IncidentDetailScreen(incidentId: state.pathParameters['id'] ?? ''),
+    ),
+    GoRoute(
+      path: '/incident-history',
+      builder: (_, __) => const IncidentHistoryScreen(),
     ),
     GoRoute(
       path: '/qr-generator',

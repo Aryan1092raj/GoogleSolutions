@@ -4,41 +4,51 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme.dart';
 import '../../../core/severity_colors.dart';
-import '../../../core/widgets/interactive_background.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/sos_provider.dart';
 import '../providers/stream_provider.dart';
 import '../widgets/incident_chat_panel.dart';
 
-/// Camera preview background widget that displays live camera feed
-class _CameraBackground extends ConsumerWidget {
-  const _CameraBackground();
+const _bg = Color(0xFF09090B);
+const _surface = Color(0xFF121215);
+const _surfaceHigh = Color(0xFF18181B);
+const _surfaceHighest = Color(0xFF1E1E22);
+const _outlineVariant = Color(0xFF27272A);
+const _primary = Color(0xFFA78BFA);
+const _primaryContainer = Color(0xFF7C3AED);
+const _onSurface = Color(0xFFFAFAFA);
+const _onSurfaceMuted = Color(0xFFA1A1AA);
+const _tertiary = Color(0xFF34D399);
+const _error = Color(0xFFEF4444);
+
+class _CameraPreviewLayer extends ConsumerWidget {
+  const _CameraPreviewLayer();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final camera = ref.watch(cameraServiceProvider);
-
-    if (!camera.buildPreview().toString().contains('CameraPreview')) {
-      // Camera not initialized yet, show loading indicator
+    final preview = camera.buildPreview();
+    if (!preview.toString().contains('CameraPreview')) {
       return Container(
-        color: kBackground,
+        color: _surface,
         child: const Center(
           child: CircularProgressIndicator(
-            color: kPrimary,
-            strokeWidth: 2.5,
+            color: _primary,
+            strokeWidth: 2.2,
           ),
         ),
       );
     }
 
-    return FittedBox(
-      fit: BoxFit.cover,
-      child: SizedBox(
-        width: MediaQuery.of(context).size.width,
-        height: MediaQuery.of(context).size.height,
-        child: camera.buildPreview(),
+    return SizedBox.expand(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height,
+          child: preview,
+        ),
       ),
     );
   }
@@ -61,7 +71,6 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
   bool _streamStartRequested = false;
   String? _previousSeverity;
 
-  // ETA countdown timer
   Timer? _etaTimer;
   int _etaSecondsRemaining = 0;
 
@@ -74,7 +83,7 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     )..repeat(reverse: true);
 
     _slideController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 380),
       vsync: this,
     )..forward();
 
@@ -83,7 +92,6 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
       vsync: this,
     );
 
-    // Listen to SOS state changes for ETA timer
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.listen<SOSState>(sosProvider, (previous, next) {
         if (next.etaMinutes != null &&
@@ -139,25 +147,16 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     return '$m:$s';
   }
 
-  /// Trigger flash animation 3 times when severity escalates
-  void _triggerSeverityFlash() {
-    int flashCount = 0;
-    const maxFlashes = 6; // 3 on/off cycles
-
-    void flashCallback() {
-      flashCount++;
-      if (flashCount < maxFlashes) {
-        _severityFlashController.forward(from: 0);
-      }
+  Future<void> _triggerSeverityFlash() async {
+    if (_severityFlashController.isAnimating || !mounted) {
+      return;
     }
-
-    _severityFlashController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        flashCallback();
+    for (var i = 0; i < 3; i++) {
+      if (!mounted) {
+        return;
       }
-    });
-
-    flashCallback();
+      await _severityFlashController.forward(from: 0);
+    }
   }
 
   @override
@@ -165,11 +164,11 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     ref.watch(streamProvider);
     final state = ref.watch(sosProvider);
     final profile = ref.watch(guestProfileProvider);
-    final severity = state.severity ?? 'LOW';
-    final message = state.aiMessage ?? 'Analyzing emergency...';
+    final severity = (state.severity ?? 'LOW').toUpperCase();
+    final message = state.aiMessage ??
+        'Security is on the way. Stay calm and remain in place.';
     final severityColorVal = severityColor(severity);
 
-    // Trigger flash animation when severity escalates to HIGH or CRITICAL
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_previousSeverity != null &&
           _previousSeverity != severity &&
@@ -179,196 +178,138 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
       _previousSeverity = severity;
     });
 
-    // Show queued state overlay if status is queued
     if (state.status == SOSStatus.queued) {
       return _buildQueuedOverlay();
     }
 
-    return InteractiveBackground(
-      child: Scaffold(
-        backgroundColor: kBackground,
-        body: Stack(
-          children: [
-            // Camera preview background
-            const _CameraBackground(),
-            // Dark gradient overlay
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      kBackground.withValues(alpha: 0.6),
-                      Colors.transparent,
-                      kBackground.withValues(alpha: 0.85),
-                    ],
-                    stops: const [0, 0.35, 1],
-                  ),
-                ),
-              ),
-            ),
-            // Content
-            SafeArea(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  children: [
-                    _buildTopBar(severity),
-                    const Spacer(),
-                    _buildBottomPanel(
-                      context,
-                      state,
-                      profile,
-                      severity,
-                      message,
-                      severityColorVal,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build overlay for queued SOS state with orange pulsing border.
-  Widget _buildQueuedOverlay() {
     return Scaffold(
-      backgroundColor: kBackground,
+      backgroundColor: _bg,
       body: Stack(
         children: [
-          // Dark background
-          Positioned.fill(
-            child: Container(color: kBackground),
-          ),
-          // Dark gradient overlay
-          Positioned.fill(
-            child: Container(
+          const Positioned.fill(
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    kBackground.withValues(alpha: 0.75),
-                    Colors.transparent,
-                    kBackground.withValues(alpha: 0.95),
-                  ],
-                  stops: const [0, 0.35, 1],
+                  colors: [Color(0xFF0C0C0F), _bg],
                 ),
               ),
             ),
           ),
-          // Centered queued message
           SafeArea(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: AnimatedBuilder(
-                  animation: _pulseController,
-                  builder: (context, child) {
-                    return Container(
-                      padding: const EdgeInsets.all(32),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: Colors.orange.withValues(
-                            alpha: 0.4 + (_pulseController.value * 0.6),
-                          ),
-                          width: 3,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.orange.withValues(
-                              alpha: 0.2 * _pulseController.value,
-                            ),
-                            blurRadius: 30,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
+            bottom: false,
+            child: Column(
+              children: [
+                _buildTopHeader(profile),
+                Expanded(
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.08),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: _slideController,
+                      curve: Curves.easeOutCubic,
+                    )),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 126),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Pulsing SOS icon
-                          AnimatedBuilder(
-                            animation: _pulseController,
-                            builder: (context, _) {
-                              return Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.orange.withValues(
-                                    alpha:
-                                        0.15 + (_pulseController.value * 0.15),
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.sos_rounded,
-                                  color: Colors.orange,
-                                  size: 40,
-                                ),
-                              );
-                            },
+                          _buildLiveStreamCard(
+                            severity,
+                            severityColorVal,
                           ),
-                          const SizedBox(height: 24),
-                          // Title
-                          const Text(
-                            'SOS Queued',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          const SizedBox(height: 14),
+                          _buildAIStatusCard(
+                            state,
+                            severity,
+                            message,
+                            severityColorVal,
                           ),
-                          const SizedBox(height: 12),
-                          // Subtitle
-                          AnimatedBuilder(
-                            animation: _pulseController,
-                            builder: (context, _) {
-                              return Text(
-                                'Reconnecting...',
-                                style: TextStyle(
-                                  color: Colors.orange.withValues(
-                                    alpha: 0.7 + (_pulseController.value * 0.3),
-                                  ),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              );
-                            },
+                          const SizedBox(height: 14),
+                          IncidentChatPanel(
+                            incidentId: widget.incidentId,
+                            profile: profile,
                           ),
-                          const SizedBox(height: 8),
-                          // Info text
-                          const Text(
-                            'Your emergency request will be sent automatically when connection is restored.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: kTextMuted,
-                              fontSize: 14,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          // Loading indicator
-                          const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.orange,
-                              strokeWidth: 2.5,
-                            ),
-                          ),
+                          const SizedBox(height: 14),
+                          _buildActionButtons(context),
                         ],
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomNav(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopHeader(GuestProfile? profile) {
+    final hotel = (profile?.hotelId.trim().isNotEmpty ?? false)
+        ? profile!.hotelId.trim()
+        : 'Hotel';
+    final room = (profile?.roomNumber.trim().isNotEmpty ?? false)
+        ? profile!.roomNumber.trim()
+        : '--';
+    final initial = (profile?.guestName.trim().isNotEmpty ?? false)
+        ? profile!.guestName.trim().substring(0, 1).toUpperCase()
+        : 'G';
+
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: _bg,
+        border: Border(
+          bottom: BorderSide(
+            color: _outlineVariant,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.emergency_share,
+            color: _primary,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$hotel • Room $room',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _onSurface,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _surfaceHigh,
+              shape: BoxShape.circle,
+              border: Border.all(color: _outlineVariant),
+            ),
+            child: Text(
+              initial,
+              style: const TextStyle(
+                color: _onSurface,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
               ),
             ),
           ),
@@ -377,177 +318,131 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     );
   }
 
-  Widget _buildTopBar(String severity) {
-    return Row(
-      children: [
-        // EMERGENCY ACTIVE pill
-        AnimatedBuilder(
-          animation: _pulseController,
-          builder: (context, child) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: kPrimary.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: kPrimary.withValues(alpha: 0.5),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: kPrimary.withValues(
-                        alpha: 0.5 * _pulseController.value),
-                    blurRadius: 20,
-                    spreadRadius: 2,
+  Widget _buildLiveStreamCard(String severity, Color severityColorVal) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _outlineVariant),
+      ),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const _CameraPreviewLayer(),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      _bg.withValues(alpha: 0.10),
+                      _bg.withValues(alpha: 0.22),
+                      _bg.withValues(alpha: 0.76),
+                    ],
+                    stops: const [0.0, 0.45, 1.0],
                   ),
-                ],
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Blinking white dot
-                  AnimatedBuilder(
+              Positioned(
+                top: 12,
+                left: 12,
+                child: _buildCapsule(
+                  leading: AnimatedBuilder(
                     animation: _pulseController,
                     builder: (context, _) {
                       return Container(
-                        width: 6,
-                        height: 6,
+                        width: 8,
+                        height: 8,
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(
-                            alpha: 0.5 + _pulseController.value * 0.5,
+                          color: _error.withValues(
+                            alpha: 0.72 + (0.28 * _pulseController.value),
                           ),
+                          shape: BoxShape.circle,
                         ),
                       );
                     },
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'EMERGENCY ACTIVE',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ],
+                  label: 'LIVE STREAM ACTIVE',
+                ),
               ),
-            );
-          },
-        ),
-        const Spacer(),
-        // LIVE badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: glassSurfaceDecoration,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, _) {
-                  return Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: kPrimary.withValues(
-                        alpha: 0.8 + _pulseController.value * 0.2,
+              Positioned(
+                top: 12,
+                right: 12,
+                child: _buildCapsule(
+                  leading: const Icon(
+                    Icons.mic,
+                    color: _primary,
+                    size: 14,
+                  ),
+                  label: 'AUDIO ON',
+                ),
+              ),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 14,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'STATUS',
+                            style: TextStyle(
+                              color: _onSurfaceMuted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Severity Level: ${_toTitle(severity)}',
+                            style: TextStyle(
+                              color: severityColorVal,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'LIVE',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'DURATION',
+                          style: TextStyle(
+                            color: _onSurfaceMuted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        StreamBuilder(
+                          stream: Stream.periodic(const Duration(seconds: 1)),
+                          builder: (_, __) => Text(
+                            _elapsed,
+                            style: const TextStyle(
+                              color: _primary,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'monospace',
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Elapsed timer
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: glassSurfaceDecoration,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.timer, color: Colors.white70, size: 14),
-              const SizedBox(width: 6),
-              StreamBuilder(
-                stream: Stream.periodic(const Duration(seconds: 1)),
-                builder: (_, __) => Text(
-                  _elapsed,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomPanel(
-    BuildContext context,
-    SOSState state,
-    GuestProfile? profile,
-    String severity,
-    String message,
-    Color severityColorVal,
-  ) {
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0, 1),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: _slideController,
-        curve: Curves.easeOutCubic,
-      )),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        decoration: BoxDecoration(
-          color: kBackground.withValues(alpha: 0.9),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border(
-            top: BorderSide(
-              color: severityColorVal.withValues(alpha: 0.3),
-              width: 3,
-            ),
-          ),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Severity badge
-              _buildSeverityBadge(severity, severityColorVal),
-              const SizedBox(height: 14),
-              // AI Status card
-              _buildAIStatusCard(state, severity, message, severityColorVal),
-              const SizedBox(height: 14),
-              // Chat panel
-              IncidentChatPanel(
-                incidentId: widget.incidentId,
-                profile: profile,
-              ),
-              const SizedBox(height: 14),
-              // Action buttons
-              _buildActionButtons(context, state),
             ],
           ),
         ),
@@ -555,33 +450,26 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     );
   }
 
-  Widget _buildSeverityBadge(String severity, Color severityColorVal) {
+  Widget _buildCapsule({required Widget leading, required String label}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: severityColorVal.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: severityColorVal.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        color: Colors.black.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            severityIcon(severity),
-            color: severityColorVal,
-            size: 16,
-          ),
-          const SizedBox(width: 8),
+          leading,
+          const SizedBox(width: 6),
           Text(
-            severity,
-            style: TextStyle(
-              color: severityColorVal,
-              fontSize: 12,
+            label,
+            style: const TextStyle(
+              color: _onSurface,
+              fontSize: 10,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1,
+              letterSpacing: 1.1,
             ),
           ),
         ],
@@ -598,22 +486,18 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     return AnimatedBuilder(
       animation: _severityFlashController,
       builder: (context, child) {
-        // Calculate flash opacity: oscillates between 0 and 1
         final flashValue = _severityFlashController.isAnimating
             ? _severityFlashController.value
             : 0.0;
-
-        // Border color flashes between severity color and transparent
-        final animatedBorderColor = severityColorVal.withValues(
-          alpha: 0.4 + (flashValue * 0.6), // Oscillates between 0.4 and 1.0
-        );
-
         return Container(
-          padding: const EdgeInsets.all(18),
-          decoration: glassSurfaceDecoration.copyWith(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: animatedBorderColor,
-              width: 1.5,
+              color:
+                  severityColorVal.withValues(alpha: 0.18 + flashValue * 0.56),
             ),
           ),
           child: child,
@@ -623,155 +507,116 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: severityColorVal.withValues(alpha: 0.2),
+                  color: _primary.withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  severityIcon(severity),
-                  color: severityColorVal,
-                  size: 20,
+                child: const Icon(
+                  Icons.support_agent,
+                  color: _primary,
+                  size: 18,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: severityColorVal.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        severity,
-                        style: TextStyle(
-                          color: severityColorVal,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                        ),
+                    const Text(
+                      'AI SAFETY ASSISTANT',
+                      style: TextStyle(
+                        color: _primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(
-                          state.helpOnWay
-                              ? Icons.local_shipping_outlined
-                              : Icons.send_outlined,
-                          color: state.helpOnWay ? kSecondary : kTextMuted,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                state.helpOnWay
-                                    ? 'Help is on the way'
-                                    : 'Dispatching...',
-                                style: TextStyle(
-                                  color:
-                                      state.helpOnWay ? kSecondary : kTextMuted,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              // ETA Countdown Timer
-                              if (state.etaMinutes != null &&
-                                  _etaSecondsRemaining > 0)
-                                StreamBuilder(
-                                  stream: Stream.periodic(
-                                      const Duration(seconds: 1)),
-                                  builder: (_, __) {
-                                    final minutes = _etaSecondsRemaining ~/ 60;
-                                    final seconds = _etaSecondsRemaining % 60;
-                                    return Text(
-                                      'Help arriving in ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-                                      style: const TextStyle(
-                                        color: kSecondary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        fontFamily: 'monospace',
-                                      ),
-                                    );
-                                  },
-                                )
-                              else if (state.etaMinutes != null &&
-                                  _etaSecondsRemaining <= 0)
-                                const Text(
-                                  'Responders should be with you now',
-                                  style: TextStyle(
-                                    color: kSecondary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        color: _onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // AI Message
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0x0FFFFFFF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0x1AFFFFFF),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                state.helpOnWay ? Icons.security : Icons.send_rounded,
+                color: state.helpOnWay ? _tertiary : _onSurfaceMuted,
+                size: 16,
               ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.psychology_outlined,
-                  color: kSecondary,
-                  size: 18,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: const TextStyle(
-                      color: kTextPrimary,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  state.helpOnWay ? 'Dispatch confirmed' : 'Dispatching...',
+                  style: TextStyle(
+                    color: state.helpOnWay ? _tertiary : _onSurfaceMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
-            ),
+              ),
+              if (state.etaMinutes != null)
+                Text(
+                  _etaSecondsRemaining > 0
+                      ? _formatCountdown(_etaSecondsRemaining)
+                      : 'Arriving now',
+                  style: const TextStyle(
+                    color: _primary,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(
+                severityIcon(severity),
+                color: severityColorVal,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Current Severity: ${_toTitle(severity)}',
+                style: TextStyle(
+                  color: severityColorVal,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, SOSState state) {
+  Widget _buildActionButtons(BuildContext context) {
     return Row(
       children: [
         Expanded(
           child: _buildActionButton(
-            context: context,
             label: 'False Alarm',
-            icon: Icons.close,
-            isPrimary: false,
+            icon: Icons.backspace_outlined,
+            backgroundColor: _surface,
+            foregroundColor: _onSurface,
+            borderColor: _outlineVariant,
             onPressed: () async {
               final confirm = await _showConfirmDialog(
                 context: context,
@@ -787,13 +632,14 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
             },
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 10),
         Expanded(
           child: _buildActionButton(
-            context: context,
             label: 'End Emergency',
-            icon: Icons.check,
-            isPrimary: true,
+            icon: Icons.cancel_outlined,
+            backgroundColor: const Color(0xFF3B1111),
+            foregroundColor: const Color(0xFFFCA5A5),
+            borderColor: _error.withValues(alpha: 0.35),
             onPressed: () async {
               final confirm = await _showConfirmDialog(
                 context: context,
@@ -816,52 +662,166 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
   }
 
   Widget _buildActionButton({
-    required BuildContext context,
     required String label,
     required IconData icon,
-    required bool isPrimary,
+    required Color backgroundColor,
+    required Color foregroundColor,
+    required Color borderColor,
     required VoidCallback onPressed,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: isPrimary
-            ? [
-                BoxShadow(
-                  color: kPrimary.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
+    return SizedBox(
+      height: 56,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? kPrimary : Colors.transparent,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          backgroundColor: backgroundColor,
+          foregroundColor: foregroundColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: isPrimary
-                ? BorderSide.none
-                : const BorderSide(color: Color(0x4DFFFFFF)),
+            side: BorderSide(color: borderColor),
           ),
+          elevation: 0,
         ),
         onPressed: onPressed,
-        child: Row(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 18),
-            const SizedBox(width: 8),
+            const SizedBox(height: 2),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: _bg,
+        border: Border(
+          top: BorderSide(
+            color: _outlineVariant,
+            width: 1,
+          ),
+        ),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        12,
+        8,
+        12,
+        MediaQuery.of(context).padding.bottom + 8,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _BottomNavItem(
+            icon: Icons.radio_button_checked,
+            label: 'SOS',
+            active: true,
+            onTap: () {},
+          ),
+          _BottomNavItem(
+            icon: Icons.chat_bubble_outline,
+            label: 'Messages',
+            active: false,
+            onTap: () => _showComingSoon(context, 'Messages'),
+          ),
+          _BottomNavItem(
+            icon: Icons.info_outline,
+            label: 'Guide',
+            active: false,
+            onTap: () => _showComingSoon(context, 'Guide'),
+          ),
+          _BottomNavItem(
+            icon: Icons.person_outline,
+            label: 'Profile',
+            active: false,
+            onTap: () => context.go('/profile'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQueuedOverlay() {
+    return Scaffold(
+      backgroundColor: _bg,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, _) {
+              return Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: Colors.orange.withValues(
+                      alpha: 0.42 + (_pulseController.value * 0.45),
+                    ),
+                    width: 2.8,
+                  ),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.sos_rounded,
+                      size: 42,
+                      color: Colors.orange,
+                    ),
+                    SizedBox(height: 14),
+                    Text(
+                      'SOS Queued',
+                      style: TextStyle(
+                        color: _onSurface,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'Network unavailable. We will send your emergency request automatically when connection returns.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _onSurfaceMuted,
+                        fontSize: 14,
+                        height: 1.45,
+                      ),
+                    ),
+                    SizedBox(height: 18),
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.orange,
+                        strokeWidth: 2.2,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showComingSoon(BuildContext context, String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: _surfaceHighest,
+        content: Text('$feature panel coming soon.'),
       ),
     );
   }
@@ -874,40 +834,103 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     return showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: kSurface,
+        backgroundColor: _surfaceHighest,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: _outlineVariant),
         ),
         title: Text(
           title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: kTextPrimary,
-                fontWeight: FontWeight.w600,
-              ),
+          style: const TextStyle(
+            color: _onSurface,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         content: Text(
           message,
-          style: const TextStyle(color: kTextMuted),
+          style: const TextStyle(color: _onSurfaceMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text(
               'Cancel',
-              style: TextStyle(color: kTextMuted),
+              style: TextStyle(color: _onSurfaceMuted),
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+              backgroundColor: _primaryContainer,
             ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Confirm'),
           ),
         ],
+      ),
+    );
+  }
+
+  String _toTitle(String value) {
+    final lower = value.toLowerCase();
+    return '${lower.substring(0, 1).toUpperCase()}${lower.substring(1)}';
+  }
+
+  String _formatCountdown(int seconds) {
+    final minutes = seconds ~/ 60;
+    final rem = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${rem.toString().padLeft(2, '0')}';
+  }
+}
+
+class _BottomNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _BottomNavItem({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const activeColor = _primary;
+    const inactiveColor = _onSurfaceMuted;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Container(
+        width: 72,
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: active
+            ? BoxDecoration(
+                color: _primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
+              )
+            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: active ? activeColor : inactiveColor,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: active ? activeColor : inactiveColor,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

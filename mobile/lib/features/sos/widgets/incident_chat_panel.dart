@@ -1,10 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/theme.dart';
 import '../../auth/providers/auth_provider.dart';
+
+const _surface = Color(0xFF121215);
+const _surfaceHigh = Color(0xFF18181B);
+const _surfaceHighest = Color(0xFF1E1E22);
+const _outlineVariant = Color(0xFF27272A);
+const _primary = Color(0xFFA78BFA);
+const _onSurface = Color(0xFFFAFAFA);
+const _onSurfaceMuted = Color(0xFFA1A1AA);
+const _tertiary = Color(0xFF34D399);
 
 class IncidentChatPanel extends StatefulWidget {
   final String incidentId;
@@ -48,6 +55,7 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
       final senderLabel = widget.profile?.guestName.isNotEmpty == true
           ? widget.profile!.guestName
           : 'Guest';
+
       await FirebaseFirestore.instance
           .collection('incidents')
           .doc(widget.incidentId)
@@ -84,157 +92,158 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF07141F).withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _surfaceHigh.withValues(alpha: 0.6),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              border: Border.all(color: Colors.transparent),
+            ),
+            child: Row(
               children: [
-                Text(
-                  'RESCUE CHANNEL',
-                  style: GoogleFonts.inter(
-                    color: kTextMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.6,
+                const Icon(
+                  Icons.security,
+                  color: _tertiary,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'HOTEL SECURITY DISPATCH',
+                    style: TextStyle(
+                      color: _onSurface,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.1,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: kSecondary.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    'LIVE STAFF CHAT',
-                    style: GoogleFonts.inter(
-                      color: kSecondary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                    ),
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: _tertiary,
+                    shape: BoxShape.circle,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 170,
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _messagesStream,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: kSecondary),
-                    );
-                  }
+          ),
+          SizedBox(
+            height: 220,
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _messagesStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: _primary,
+                      strokeWidth: 2.0,
+                    ),
+                  );
+                }
 
-                  final docs = snapshot.data?.docs ?? const [];
-                  if (docs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.mark_chat_unread_outlined,
-                            color: Colors.white.withValues(alpha: 0.4),
-                            size: 26,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Security can message you here.',
-                            style: GoogleFonts.inter(
-                              color: kTextMuted,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
+                final docs = snapshot.data?.docs ?? const [];
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'Security can message you here.',
+                      style: TextStyle(
+                        color: _onSurfaceMuted,
+                        fontSize: 13,
                       ),
-                    );
-                  }
+                    ),
+                  );
+                }
 
-                  return ListView.separated(
-                    itemCount: docs.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final data = docs[index].data();
-                      final isGuest = data['senderRole'] == 'GUEST';
-                      final label = data['senderLabel']?.toString() ??
-                          (isGuest ? 'You' : 'Security Desk');
-                      final text = data['text']?.toString() ?? '';
-                      final createdAtMs =
-                          (data['createdAtMs'] as num?)?.toInt() ?? 0;
+                return ListView.separated(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data();
+                    final isGuest = data['senderRole'] == 'GUEST';
+                    final label = data['senderLabel']?.toString() ??
+                        (isGuest ? 'You' : 'Dispatch');
+                    final text = data['text']?.toString() ?? '';
+                    final createdAtMs =
+                        (data['createdAtMs'] as num?)?.toInt() ?? 0;
 
-                      return Align(
-                        alignment: isGuest
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 320),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
+                    return Align(
+                      alignment: isGuest
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 290),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isGuest
+                                ? _primary.withValues(alpha: 0.12)
+                                : _surfaceHighest,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(14),
+                              topRight: const Radius.circular(14),
+                              bottomLeft: Radius.circular(isGuest ? 14 : 4),
+                              bottomRight: Radius.circular(isGuest ? 4 : 14),
+                            ),
+                            border: Border.all(
                               color: isGuest
-                                  ? kSecondary.withValues(alpha: 0.18)
-                                  : Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: isGuest
-                                    ? kSecondary.withValues(alpha: 0.24)
-                                    : Colors.white.withValues(alpha: 0.08),
+                                  ? _primary.withValues(alpha: 0.32)
+                                  : _outlineVariant,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$label • ${_timeLabel(createdAtMs)}',
+                                style: TextStyle(
+                                  color: isGuest ? _primary : _onSurfaceMuted,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.6,
+                                ),
                               ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      label.toUpperCase(),
-                                      style: GoogleFonts.inter(
-                                        color: isGuest ? kSecondary : kTextMuted,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 1.1,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      _timeLabel(createdAtMs),
-                                      style: GoogleFonts.inter(
-                                        color: kTextMuted,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
+                              const SizedBox(height: 6),
+                              Text(
+                                text,
+                                style: const TextStyle(
+                                  color: _onSurface,
+                                  fontSize: 13,
+                                  height: 1.4,
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  text,
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    height: 1.45,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                  );
-                },
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: _outlineVariant),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
+            child: Row(
               children: [
                 Expanded(
                   child: TextField(
@@ -242,32 +251,66 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
                     minLines: 1,
                     maxLines: 2,
                     enabled: !_sending,
-                    decoration: const InputDecoration(
-                      hintText: 'Reply to security team...',
+                    style: const TextStyle(color: _onSurface, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      hintStyle: const TextStyle(
+                        color: _onSurfaceMuted,
+                        fontSize: 13,
+                      ),
+                      filled: true,
+                      fillColor: _surfaceHighest,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _outlineVariant),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _outlineVariant),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _primary),
+                      ),
                     ),
                     onSubmitted: (_) => _sendReply(),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 _sending
                     ? const SizedBox(
-                        width: 42,
-                        height: 42,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : IconButton.filled(
-                        onPressed: _sendReply,
-                        style: IconButton.styleFrom(
-                          backgroundColor: kSecondary,
-                          foregroundColor: kBackground,
-                          minimumSize: const Size(48, 48),
+                        width: 38,
+                        height: 38,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: _primary,
                         ),
-                        icon: const Icon(Icons.arrow_upward_rounded),
+                      )
+                    : SizedBox(
+                        width: 38,
+                        height: 38,
+                        child: ElevatedButton(
+                          onPressed: _sendReply,
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            backgroundColor: _primary,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Icon(Icons.send, size: 18),
+                        ),
                       ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -277,8 +320,10 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
       return '--:--';
     }
     final dateTime = DateTime.fromMillisecondsSinceEpoch(createdAtMs);
-    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final hour24 = dateTime.hour;
+    final hour12 = hour24 == 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24);
     final minute = dateTime.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
+    final period = hour24 >= 12 ? 'PM' : 'AM';
+    return '$hour12:$minute $period';
   }
 }
