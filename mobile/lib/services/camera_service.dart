@@ -4,6 +4,9 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../core/constants.dart';
 
 abstract class AudioChunkSource {
   Future<void> start();
@@ -66,13 +69,55 @@ class MethodChannelAudioChunkSource implements AudioChunkSource {
   }
 }
 
+abstract class CapturePermissionGate {
+  Future<void> ensureCapturePermissions();
+}
+
+class PermissionHandlerCapturePermissionGate implements CapturePermissionGate {
+  @override
+  Future<void> ensureCapturePermissions() async {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
+      return;
+    }
+
+    final statuses = await <Permission>[
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+
+    final denied = <String>[];
+    if (!(statuses[Permission.camera]?.isGranted ?? false)) {
+      denied.add('camera');
+    }
+    if (!(statuses[Permission.microphone]?.isGranted ?? false)) {
+      denied.add('microphone');
+    }
+
+    if (denied.isEmpty) {
+      return;
+    }
+
+    throw CameraException(
+      'permissionDenied',
+      'Required capture permissions denied: ${denied.join(', ')}.',
+    );
+  }
+}
+
 class CameraService {
-  CameraService({AudioChunkSource? audioSource})
-      : _audioSource = audioSource ?? MethodChannelAudioChunkSource();
+  CameraService({
+    AudioChunkSource? audioSource,
+    CapturePermissionGate? permissionGate,
+  })  : _audioSource = audioSource ?? MethodChannelAudioChunkSource(),
+        _permissionGate =
+            permissionGate ?? PermissionHandlerCapturePermissionGate();
 
   CameraController? _controller;
   Future<void>? _initializeFuture;
   final AudioChunkSource _audioSource;
+  final CapturePermissionGate _permissionGate;
 
   bool _streaming = false;
   bool _audioStreaming = false;
@@ -95,6 +140,7 @@ class CameraService {
   }
 
   Future<void> _initializeInternal() async {
+    await _permissionGate.ensureCapturePermissions();
     final cameras = await availableCameras();
     if (cameras.isEmpty) {
       throw CameraException('noCamera', 'No camera available on this device.');
@@ -163,7 +209,16 @@ class CameraService {
   Future<String> captureAudio() async {
     try {
       await _ensureAudioStarted();
-      return await _audioSource.pullChunk();
+      if (!_audioStreaming) {
+        return '';
+      }
+
+      final chunk = await _audioSource.pullChunk();
+      if (chunk.isEmpty) {
+        return '';
+      }
+
+      return _encodePcm16ChunkAsWavBase64(chunk);
     } catch (_) {
       return '';
     }
@@ -203,5 +258,33 @@ class CameraService {
 
     _audioStreaming = false;
     await _audioSource.stop();
+  }
+
+  String _encodePcm16ChunkAsWavBase64(String pcmBase64) {
+    final pcmBytes = base64Decode(pcmBase64);
+    if (pcmBytes.isEmpty) {
+      return '';
+    }
+
+    final wavBytes = Uint8List(44 + pcmBytes.length);
+    final header = ByteData.sublistView(wavBytes, 0, 44);
+    const byteRate = AppConstants.audioSampleRate * 2;
+
+    wavBytes.setRange(44, wavBytes.length, pcmBytes);
+    header.setUint32(0, 0x52494646, Endian.big); // RIFF
+    header.setUint32(4, pcmBytes.length + 36, Endian.little);
+    header.setUint32(8, 0x57415645, Endian.big); // WAVE
+    header.setUint32(12, 0x666d7420, Endian.big); // fmt
+    header.setUint32(16, 16, Endian.little);
+    header.setUint16(20, 1, Endian.little); // PCM
+    header.setUint16(22, 1, Endian.little); // mono
+    header.setUint32(24, AppConstants.audioSampleRate, Endian.little);
+    header.setUint32(28, byteRate, Endian.little);
+    header.setUint16(32, 2, Endian.little); // block align
+    header.setUint16(34, 16, Endian.little); // bits per sample
+    header.setUint32(36, 0x64617461, Endian.big); // data
+    header.setUint32(40, pcmBytes.length, Endian.little);
+
+    return base64Encode(wavBytes);
   }
 }

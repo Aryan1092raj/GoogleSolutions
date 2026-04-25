@@ -72,7 +72,7 @@ class WebSocketService {
         'video': videoB64, 
         'audio': audioB64, 
         'mimeTypeVideo': 'image/jpeg', 
-        'mimeTypeAudio': 'audio/pcm', 
+        'mimeTypeAudio': 'audio/wav', 
       } 
     }); 
   } 
