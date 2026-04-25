@@ -19,6 +19,12 @@ class StaffLoginScreen extends ConsumerStatefulWidget {
 
 class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
     with SingleTickerProviderStateMixin {
+  static const Set<String> _allowedStaffRoles = <String>{
+    'SECURITY',
+    'MANAGER',
+    'FIRST_RESPONDER',
+  };
+
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _loading = false;
@@ -63,8 +69,13 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
           .signInWithEmailAndPassword(email: email, password: password);
       final token = await cred.user?.getIdTokenResult(true);
       final claims = token?.claims;
-      final hotelId = (claims?['hotelId'] as String?) ?? 'hotel1';
-      final role = (claims?['role'] as String?) ?? 'SECURITY';
+      final hotelId = (claims?['hotelId'] as String?)?.trim() ?? '';
+      final role = ((claims?['role'] as String?) ?? '').trim().toUpperCase();
+      if (hotelId.isEmpty || !_allowedStaffRoles.contains(role)) {
+        await FirebaseAuth.instance.signOut();
+        _snack('Account is not provisioned for staff dashboard access.');
+        return;
+      }
       final profile = StaffProfile(
         uid: cred.user?.uid ?? '',
         hotelId: hotelId,

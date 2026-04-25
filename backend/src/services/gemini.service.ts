@@ -16,14 +16,14 @@ export function getVertexClient() {
 }
  
 export function isGeminiConfigured() { 
-  if (!process.env.GOOGLE_CLOUD_PROJECT) { 
-    return false; 
-  } 
-  if (!process.env.VERTEX_AI_LOCATION) { 
-    return false; 
-  } 
-  if (!process.env.GEMINI_MODEL) { 
-    return false; 
-  } 
-  return true; 
+  const model = (process.env.GEMINI_MODEL || '').trim();
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  const project = (process.env.GOOGLE_CLOUD_PROJECT || '').trim();
+  const location =
+    (process.env.GOOGLE_CLOUD_LOCATION || process.env.VERTEX_AI_LOCATION || '').trim();
+
+  const apiModeReady = apiKey.length > 0 && model.length > 0;
+  const vertexModeReady = project.length > 0 && location.length > 0 && model.length > 0;
+
+  return apiModeReady || vertexModeReady;
 }

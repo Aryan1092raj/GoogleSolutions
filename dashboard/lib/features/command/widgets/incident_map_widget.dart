@@ -57,19 +57,21 @@ class _IncidentMapWidgetState extends State<IncidentMapWidget> {
             zoom: 17,
           ),
           onMapCreated: (c) {},
-          markers: {
-            Marker(
-              markerId: const MarkerId('incident'),
-              position: _position,
-              infoWindow: InfoWindow(
-                title: 'Room ${widget.roomNumber}',
-                snippet: widget.severity,
-              ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                widget.severity == 'CRITICAL' || widget.severity == 'HIGH'
-                    ? BitmapDescriptor.hueRed
-                    : BitmapDescriptor.hueOrange,
-              ),
+          circles: {
+            Circle(
+              circleId: const CircleId('incident-ring'),
+              center: _position,
+              radius: 10,
+              strokeWidth: 3,
+              strokeColor:
+                  widget.severity == 'CRITICAL' || widget.severity == 'HIGH'
+                      ? const Color(0xFFFF453A)
+                      : const Color(0xFFFF9F0A),
+              fillColor:
+                  (widget.severity == 'CRITICAL' || widget.severity == 'HIGH'
+                          ? const Color(0x33FF453A)
+                          : const Color(0x33FF9F0A))
+                      .withValues(alpha: 0.30),
             ),
           },
           mapType: MapType.normal,

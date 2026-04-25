@@ -18,6 +18,12 @@ class DashboardAuthBootstrap extends ConsumerStatefulWidget {
 
 class _DashboardAuthBootstrapState
     extends ConsumerState<DashboardAuthBootstrap> {
+  static const Set<String> _allowedStaffRoles = <String>{
+    'SECURITY',
+    'MANAGER',
+    'FIRST_RESPONDER',
+  };
+
   StreamSubscription<User?>? _authSubscription;
   bool _hydrating = false;
 
@@ -48,13 +54,16 @@ class _DashboardAuthBootstrapState
 
     try {
       final profile = await resolveStaffProfile(user);
+      if (profile.hotelId.isEmpty ||
+          !_allowedStaffRoles.contains(profile.role)) {
+        await FirebaseAuth.instance.signOut();
+        ref.read(staffProfileProvider.notifier).state = StaffProfile.empty;
+        return;
+      }
       ref.read(staffProfileProvider.notifier).state = profile;
     } catch (_) {
-      ref.read(staffProfileProvider.notifier).state = StaffProfile(
-        uid: user.uid,
-        hotelId: '',
-        role: '',
-      );
+      await FirebaseAuth.instance.signOut();
+      ref.read(staffProfileProvider.notifier).state = StaffProfile.empty;
     } finally {
       if (mounted) {
         setState(() => _hydrating = false);
