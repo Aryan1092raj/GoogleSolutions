@@ -37,7 +37,7 @@ export async function alertAllStaff(hotelId: string, incident: any) {
     return;
   }
 
-  await getMessaging().sendEachForMulticast({
+  await getMessaging().sendMulticast({
     tokens: tokens,
     notification: {
       title: 'SOS ALERT - ResQLink',
@@ -66,7 +66,7 @@ export async function sendCriticalAlert(incidentId: string, aiSummary: string) {
     return;
   }
 
-  await getMessaging().sendEachForMulticast({
+  await getMessaging().sendMulticast({
     tokens,
     notification: {
       title: 'CRITICAL ALERT - ResQLink',

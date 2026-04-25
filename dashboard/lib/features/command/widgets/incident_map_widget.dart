@@ -21,14 +21,13 @@ class IncidentMapWidget extends StatefulWidget {
 }
 
 class _IncidentMapWidgetState extends State<IncidentMapWidget> {
-  LatLng get _position => LatLng(
-        widget.lat ?? 28.6139,
-        widget.lng ?? 77.2090,
-      );
+  bool get _hasCoordinates => widget.lat != null && widget.lng != null;
+
+  LatLng get _position => LatLng(widget.lat!, widget.lng!);
 
   @override
   Widget build(BuildContext context) {
-    if (widget.lat == null || widget.lng == null) {
+    if (!_hasCoordinates) {
       return Container(
         decoration: BoxDecoration(
           color: kDashSurface2,

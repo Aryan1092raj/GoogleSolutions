@@ -125,15 +125,12 @@ class SOSNotifier extends StateNotifier<SOSState> {
 
     double? lat;
     double? lng;
-    // Skip location on web - geolocator doesn't work fully on web
-    if (!kIsWeb) {
-      try {
-        final pos = await _location.getCurrentPosition();
-        lat = pos.latitude;
-        lng = pos.longitude;
-      } catch (_) {}
-      if (!mounted) return;
-    }
+    try {
+      final pos = await _location.getCurrentPosition();
+      lat = pos.latitude;
+      lng = pos.longitude;
+    } catch (_) {}
+    if (!mounted) return;
 
     final createReq = <String, dynamic>{
       'incidentId': incidentId,

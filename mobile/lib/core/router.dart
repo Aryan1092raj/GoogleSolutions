@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/auth/screens/onboarding_screen.dart';
 import '../features/auth/providers/auth_provider.dart';
+import '../features/sos/models/sos_active_panel.dart';
 import '../features/sos/screens/sos_home_screen.dart';
 import '../features/sos/screens/sos_active_screen.dart';
 import '../features/sos/screens/sos_resolved_screen.dart';
@@ -14,8 +15,15 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/', builder: (c, s) => const SplashScreen()),
     GoRoute(path: '/checkin', builder: (c, s) => const OnboardingScreen()),
     GoRoute(path: '/home', builder: (c, s) => const SOSHomeScreen()),
-    GoRoute(path: '/sos/active/:id', builder: (c, s) =>
-      SOSActiveScreen(incidentId: s.pathParameters['id'] ?? '')),
+    GoRoute(
+      path: '/sos/active/:id',
+      builder: (c, s) => SOSActiveScreen(
+        incidentId: s.pathParameters['id'] ?? '',
+        initialPanel: SOSActivePanel.fromQueryValue(
+          s.uri.queryParameters['panel'],
+        ),
+      ),
+    ),
     GoRoute(path: '/sos/resolved/:id', builder: (c, s) =>
       SOSResolvedScreen(incidentId: s.pathParameters['id'] ?? '')),
     GoRoute(path: '/profile', builder: (c, s) => const GuestProfileScreen()),

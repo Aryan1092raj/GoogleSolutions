@@ -456,20 +456,29 @@ class _HomeSosOverview extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Text(
-                    'System Status: Active',
-                    style: GoogleFonts.inter(
-                      color: kDashText,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Text(
+                      'System Status: Active',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: kDashText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  Text(
-                    'Monitoring location and safety triggers',
-                    style: GoogleFonts.inter(
-                      color: kDashTextSub,
-                      fontSize: 11,
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      'Monitoring location and safety triggers',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: GoogleFonts.inter(
+                        color: kDashTextSub,
+                        fontSize: 11,
+                      ),
                     ),
                   ),
                 ],
@@ -519,7 +528,7 @@ class _HomeSosOverview extends StatelessWidget {
                                 style: GoogleFonts.fustat(
                                   color: Colors.white,
                                   fontSize: 48,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   letterSpacing: 1.2,
                                 ),
                               ),

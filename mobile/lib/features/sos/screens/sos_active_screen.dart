@@ -6,9 +6,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/severity_colors.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../models/sos_active_panel.dart';
 import '../providers/sos_provider.dart';
-import '../providers/stream_provider.dart';
+import '../providers/stream_provider.dart' as sos_stream;
 import '../widgets/incident_chat_panel.dart';
+import '../widgets/sos_guide_panel.dart';
+import '../widgets/sos_overview_panel.dart';
 
 const _bg = Color(0xFF09090B);
 const _surface = Color(0xFF121215);
@@ -56,7 +59,14 @@ class _CameraPreviewLayer extends ConsumerWidget {
 
 class SOSActiveScreen extends ConsumerStatefulWidget {
   final String incidentId;
-  const SOSActiveScreen({super.key, required this.incidentId});
+  final SOSActivePanel initialPanel;
+  final bool autoStartStreaming;
+  const SOSActiveScreen({
+    super.key,
+    required this.incidentId,
+    this.initialPanel = SOSActivePanel.sos,
+    this.autoStartStreaming = true,
+  });
 
   @override
   ConsumerState<SOSActiveScreen> createState() => _SOSActiveScreenState();
@@ -67,9 +77,11 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
   late final AnimationController _pulseController;
   late final AnimationController _slideController;
   late final AnimationController _severityFlashController;
+  late final sos_stream.StreamNotifier _streamNotifier;
   final _start = DateTime.now();
   bool _streamStartRequested = false;
   String? _previousSeverity;
+  ProviderSubscription<SOSState>? _sosSubscription;
 
   Timer? _etaTimer;
   int _etaSecondsRemaining = 0;
@@ -81,6 +93,7 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
+    _streamNotifier = ref.read(sos_stream.streamProvider.notifier);
 
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 380),
@@ -92,21 +105,22 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
       vsync: this,
     );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listen<SOSState>(sosProvider, (previous, next) {
-        if (next.etaMinutes != null &&
-            next.etaMinutes != _etaSecondsRemaining ~/ 60) {
-          _startEtaTimer(next.etaMinutes!);
-        }
-      });
+    _sosSubscription = ref.listenManual<SOSState>(sosProvider, (
+      previous,
+      next,
+    ) {
+      if (next.etaMinutes != null &&
+          next.etaMinutes != _etaSecondsRemaining ~/ 60) {
+        _startEtaTimer(next.etaMinutes!);
+      }
     });
 
     Future.microtask(() async {
-      if (!mounted || _streamStartRequested) {
+      if (!mounted || _streamStartRequested || !widget.autoStartStreaming) {
         return;
       }
       _streamStartRequested = true;
-      await ref.read(streamProvider.notifier).startStreaming(widget.incidentId);
+      await _streamNotifier.startStreaming(widget.incidentId);
     });
   }
 
@@ -132,11 +146,12 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
 
   @override
   void dispose() {
-    ref.read(streamProvider.notifier).stopStreaming();
+    _streamNotifier.stopStreaming();
     _pulseController.dispose();
     _slideController.dispose();
     _severityFlashController.dispose();
     _etaTimer?.cancel();
+    _sosSubscription?.close();
     super.dispose();
   }
 
@@ -161,9 +176,10 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(streamProvider);
+    ref.watch(sos_stream.streamProvider);
     final state = ref.watch(sosProvider);
     final profile = ref.watch(guestProfileProvider);
+    final activePanel = widget.initialPanel;
     final severity = (state.severity ?? 'LOW').toUpperCase();
     final message = state.aiMessage ??
         'Security is on the way. Stay calm and remain in place.';
@@ -211,29 +227,16 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
                       parent: _slideController,
                       curve: Curves.easeOutCubic,
                     )),
-                    child: SingleChildScrollView(
+                    child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 126),
-                      child: Column(
-                        children: [
-                          _buildLiveStreamCard(
-                            severity,
-                            severityColorVal,
-                          ),
-                          const SizedBox(height: 14),
-                          _buildAIStatusCard(
-                            state,
-                            severity,
-                            message,
-                            severityColorVal,
-                          ),
-                          const SizedBox(height: 14),
-                          IncidentChatPanel(
-                            incidentId: widget.incidentId,
-                            profile: profile,
-                          ),
-                          const SizedBox(height: 14),
-                          _buildActionButtons(context),
-                        ],
+                      child: _buildPanelContent(
+                        context: context,
+                        profile: profile,
+                        state: state,
+                        activePanel: activePanel,
+                        severity: severity,
+                        message: message,
+                        severityColorVal: severityColorVal,
                       ),
                     ),
                   ),
@@ -701,7 +704,53 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     );
   }
 
+  Widget _buildPanelContent({
+    required BuildContext context,
+    required GuestProfile? profile,
+    required SOSState state,
+    required SOSActivePanel activePanel,
+    required String severity,
+    required String message,
+    required Color severityColorVal,
+  }) {
+    switch (activePanel) {
+      case SOSActivePanel.messages:
+        return SingleChildScrollView(
+          child: IncidentChatPanel(
+            incidentId: widget.incidentId,
+            profile: profile,
+            expanded: true,
+          ),
+        );
+      case SOSActivePanel.guide:
+        return SingleChildScrollView(
+          child: SOSGuidePanel(
+            severity: severity,
+            aiMessage: message,
+            helpOnWay: state.helpOnWay,
+            etaMinutes: state.etaMinutes,
+            hotelId: profile?.hotelId,
+            roomNumber: profile?.roomNumber,
+          ),
+        );
+      case SOSActivePanel.sos:
+        return SingleChildScrollView(
+          child: SOSOverviewPanel(
+            liveStreamCard: _buildLiveStreamCard(severity, severityColorVal),
+            aiStatusCard: _buildAIStatusCard(
+              state,
+              severity,
+              message,
+              severityColorVal,
+            ),
+            actionButtons: _buildActionButtons(context),
+          ),
+        );
+    }
+  }
+
   Widget _buildBottomNav(BuildContext context) {
+    final activePanel = widget.initialPanel;
     return Container(
       decoration: const BoxDecoration(
         color: _bg,
@@ -718,33 +767,33 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
         12,
         MediaQuery.of(context).padding.bottom + 8,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _BottomNavItem(
-            icon: Icons.radio_button_checked,
-            label: 'SOS',
-            active: true,
-            onTap: () {},
-          ),
-          _BottomNavItem(
-            icon: Icons.chat_bubble_outline,
-            label: 'Messages',
-            active: false,
-            onTap: () => _showComingSoon(context, 'Messages'),
-          ),
-          _BottomNavItem(
-            icon: Icons.info_outline,
-            label: 'Guide',
-            active: false,
-            onTap: () => _showComingSoon(context, 'Guide'),
-          ),
-          _BottomNavItem(
-            icon: Icons.person_outline,
-            label: 'Profile',
-            active: false,
-            onTap: () => context.go('/profile'),
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _BottomNavItem(
+              icon: SOSActivePanel.sos.icon,
+              label: SOSActivePanel.sos.label,
+              active: activePanel == SOSActivePanel.sos,
+              onTap: () => _showPanel(context, SOSActivePanel.sos),
+            ),
+            _BottomNavItem(
+              icon: SOSActivePanel.messages.icon,
+              label: SOSActivePanel.messages.label,
+              active: activePanel == SOSActivePanel.messages,
+              onTap: () => _showPanel(context, SOSActivePanel.messages),
+            ),
+            _BottomNavItem(
+              icon: SOSActivePanel.guide.icon,
+              label: SOSActivePanel.guide.label,
+              active: activePanel == SOSActivePanel.guide,
+              onTap: () => _showPanel(context, SOSActivePanel.guide),
+            ),
+            _BottomNavItem(
+              icon: Icons.person_outline,
+              label: 'Profile',
+              active: false,
+              onTap: () => context.go('/profile'),
+            ),
         ],
       ),
     );
@@ -817,13 +866,8 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     );
   }
 
-  void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: _surfaceHighest,
-        content: Text('$feature panel coming soon.'),
-      ),
-    );
+  void _showPanel(BuildContext context, SOSActivePanel panel) {
+    context.go('/sos/active/${widget.incidentId}?panel=${panel.queryValue}');
   }
 
   Future<bool?> _showConfirmDialog({

@@ -28,7 +28,7 @@ class StreamNotifier extends StateNotifier<StreamState> {
     if (!mounted) return;
     _chunkTimer?.cancel();
     _activeIncidentId = incidentId;
-    _camera.startCapture(); 
+    await _camera.startCapture();
     _chunkTimer = Timer.periodic(const Duration(milliseconds: AppConstants.mediaChunkIntervalMs), (_) { 
       _captureAndSend(incidentId);
     }); 
@@ -60,7 +60,7 @@ class StreamNotifier extends StateNotifier<StreamState> {
     _chunkTimer = null;
     _captureInFlight = false;
     _activeIncidentId = null;
-    _camera.stopCapture(); 
+    unawaited(_camera.stopCapture());
     state = const StreamState(streaming: false); 
   } 
 

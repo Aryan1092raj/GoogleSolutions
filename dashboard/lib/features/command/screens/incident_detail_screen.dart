@@ -908,7 +908,7 @@ class _ResolvedHero extends StatelessWidget {
                   style: GoogleFonts.fustat(
                     color: kDashText,
                     fontSize: 26,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),

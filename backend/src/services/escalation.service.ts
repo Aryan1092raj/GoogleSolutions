@@ -104,7 +104,7 @@ async function escalateToRole(hotelId: string, incidentId: string, role: string,
   }
   
   const messaging = getMessaging();
-  await messaging.sendEachForMulticast({
+  await messaging.sendMulticast({
     tokens,
     notification: {
       title: `ESCALATED SOS — ResQLink`,

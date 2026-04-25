@@ -16,11 +16,13 @@ const _tertiary = Color(0xFF34D399);
 class IncidentChatPanel extends StatefulWidget {
   final String incidentId;
   final GuestProfile? profile;
+  final bool expanded;
 
   const IncidentChatPanel({
     super.key,
     required this.incidentId,
     required this.profile,
+    this.expanded = false,
   });
 
   @override
@@ -90,6 +92,8 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final panelHeight = widget.expanded ? 420.0 : 220.0;
+
     return Container(
       decoration: BoxDecoration(
         color: _surface,
@@ -138,7 +142,7 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
             ),
           ),
           SizedBox(
-            height: 220,
+            height: panelHeight,
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: _messagesStream,
               builder: (context, snapshot) {

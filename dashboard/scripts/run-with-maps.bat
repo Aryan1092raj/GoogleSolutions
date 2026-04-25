@@ -1,6 +1,9 @@
 @echo off
-REM build-with-maps.bat — Injects Google Maps API key from .env.local and builds
+REM run-with-maps.bat - Injects Google Maps API key from .env.local and runs Flutter Web
 setlocal enabledelayedexpansion
+
+set FLUTTER_DEVICE=%~1
+if "!FLUTTER_DEVICE!"=="" set FLUTTER_DEVICE=edge
 
 cd /d "%~dp0.."
 
@@ -14,8 +17,8 @@ if "!API_KEY!"=="" (
     exit /b 1
 )
 
-echo [1/3] Google Maps API key loaded from .env.local
-echo [2/3] Injecting key into web/index.html ...
+echo [1/4] Google Maps API key loaded from .env.local
+echo [2/4] Injecting key into web/index.html ...
 
 python scripts\maps_key_patch.py inject --key "!API_KEY!"
 if errorlevel 1 (
@@ -23,20 +26,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [3/3] Building Flutter Web ...
-call flutter build web
-set BUILD_EXIT=%ERRORLEVEL%
+echo [3/4] Running Flutter on device (!FLUTTER_DEVICE!) ...
+call flutter run -d !FLUTTER_DEVICE!
+set RUN_EXIT=%ERRORLEVEL%
 
-REM Restore placeholder regardless of build result.
+echo [4/4] Restoring placeholder key in web/index.html ...
 python scripts\maps_key_patch.py restore
 if errorlevel 1 (
     echo [ERROR] Failed to restore placeholder key in web/index.html
     exit /b 1
 )
 
-if not "%BUILD_EXIT%"=="0" (
-    echo [ERROR] flutter build web failed with exit code %BUILD_EXIT%
-    exit /b %BUILD_EXIT%
+if not "%RUN_EXIT%"=="0" (
+    echo [ERROR] flutter run failed with exit code %RUN_EXIT%
+    exit /b %RUN_EXIT%
 )
 
-echo [done] index.html restored — safe to commit
+echo [done] index.html restored - safe to commit

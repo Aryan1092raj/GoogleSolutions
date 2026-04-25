@@ -26,6 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>ResQLink uses the camera to stream live visuals during an active SOS.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ResQLink uses your location to route emergency help to your room faster.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ResQLink uses the microphone to share live audio with hotel security during an SOS.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

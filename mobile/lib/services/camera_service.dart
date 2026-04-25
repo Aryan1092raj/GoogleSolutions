@@ -1,16 +1,85 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+abstract class AudioChunkSource {
+  Future<void> start();
+  Future<String> pullChunk();
+  Future<void> stop();
+}
+
+class MethodChannelAudioChunkSource implements AudioChunkSource {
+  static const MethodChannel _channel = MethodChannel('resqlink/audio_capture');
+  bool _started = false;
+  bool _available = true;
+
+  @override
+  Future<String> pullChunk() async {
+    if (!_available || !_started) {
+      return '';
+    }
+
+    try {
+      return await _channel.invokeMethod<String>('pullChunk') ?? '';
+    } on MissingPluginException {
+      _available = false;
+      _started = false;
+      return '';
+    } on PlatformException {
+      return '';
+    }
+  }
+
+  @override
+  Future<void> start() async {
+    if (!_available || _started) {
+      return;
+    }
+
+    try {
+      await _channel.invokeMethod<void>('start');
+      _started = true;
+    } on MissingPluginException {
+      _available = false;
+      _started = false;
+    }
+  }
+
+  @override
+  Future<void> stop() async {
+    if (!_available || !_started) {
+      return;
+    }
+
+    try {
+      await _channel.invokeMethod<void>('stop');
+    } on MissingPluginException {
+      _available = false;
+    } on PlatformException {
+      // Ignore stop failures; the next start will re-establish state.
+    } finally {
+      _started = false;
+    }
+  }
+}
+
 class CameraService {
+  CameraService({AudioChunkSource? audioSource})
+      : _audioSource = audioSource ?? MethodChannelAudioChunkSource();
+
   CameraController? _controller;
   Future<void>? _initializeFuture;
+  final AudioChunkSource _audioSource;
 
   // Frame streaming fields for continuous capture
   String? _latestFrameBase64;
   bool _streaming = false;
   bool _processingFrame = false;
+  bool _audioStreaming = false;
+  bool _imageStreamStarted = false;
 
   Future<void> initialize() async {
     if (_controller != null && _controller!.value.isInitialized) {
@@ -52,36 +121,58 @@ class CameraService {
     }
   }
 
-  void startCapture() async {
+  Future<void> startCapture() async {
     if (_streaming ||
         _controller == null ||
         !_controller!.value.isInitialized) {
       return;
     }
     _streaming = true;
+    unawaited(_ensureAudioStarted());
 
-    await _controller!.startImageStream((CameraImage image) async {
-      if (_processingFrame) return;
-      _processingFrame = true;
+    // `camera` does not support image streaming on web. Fall back to
+    // `takePicture()` in captureFrame() for the periodic stream loop.
+    if (kIsWeb) {
+      _imageStreamStarted = false;
+      return;
+    }
 
-      try {
-        // Convert YUV420 image to JPEG bytes
-        final bytes = await _convertYuv420ToJpeg(image);
-        _latestFrameBase64 = base64Encode(bytes);
-      } finally {
-        _processingFrame = false;
-      }
-    });
+    try {
+      await _controller!.startImageStream((CameraImage image) async {
+        if (_processingFrame) return;
+        _processingFrame = true;
+
+        try {
+          // Convert YUV420 image to JPEG bytes
+          final bytes = await _convertYuv420ToJpeg(image);
+          _latestFrameBase64 = base64Encode(bytes);
+        } finally {
+          _processingFrame = false;
+        }
+      });
+      _imageStreamStarted = true;
+    } catch (_) {
+      // Web and some platforms/drivers do not support image streaming.
+      // Keep streaming enabled but rely on `takePicture()` in captureFrame().
+      _imageStreamStarted = false;
+    }
   }
 
-  void stopCapture() async {
+  Future<void> stopCapture() async {
     if (!_streaming || _controller == null) {
+      unawaited(_stopAudio());
       return;
     }
     _streaming = false;
     _latestFrameBase64 = null;
 
-    await _controller!.stopImageStream();
+    if (_imageStreamStarted) {
+      try {
+        await _controller!.stopImageStream();
+      } catch (_) {}
+    }
+    _imageStreamStarted = false;
+    await _stopAudio();
   }
 
   Future<String> captureFrame() async {
@@ -147,7 +238,8 @@ class CameraService {
   }
 
   Future<String> captureAudio() async {
-    return '';
+    await _ensureAudioStarted();
+    return _audioSource.pullChunk();
   }
 
   Widget buildPreview() {
@@ -161,5 +253,24 @@ class CameraService {
     _initializeFuture = null;
     _controller?.dispose();
     _controller = null;
+    unawaited(_stopAudio());
+  }
+
+  Future<void> _ensureAudioStarted() async {
+    if (_audioStreaming) {
+      return;
+    }
+
+    await _audioSource.start();
+    _audioStreaming = true;
+  }
+
+  Future<void> _stopAudio() async {
+    if (!_audioStreaming) {
+      return;
+    }
+
+    _audioStreaming = false;
+    await _audioSource.stop();
   }
 }

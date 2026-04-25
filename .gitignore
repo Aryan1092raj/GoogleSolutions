@@ -22,6 +22,7 @@
 *.pfx
 *.jks
 *.keystore
+mobile/android/key.properties
 *secret*
 *credential*
 *token*
@@ -294,3 +295,15 @@ docker-compose.override.yml
 *~
 .DS_Store
 Thumbs.db
+.omx/
+.codex/*
+!.codex/agents/
+!.codex/agents/**
+!.codex/skills/
+!.codex/skills/**
+.codex/skills/.system/**
+!.codex/prompts/
+!.codex/prompts/**
+.vscode
+.codex
+progress.txt

@@ -121,6 +121,49 @@ async function recordAiUnavailable(incidentId: string, error: unknown) {
   }
 }
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    const anyErr = error as any;
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: anyErr?.code,
+      status: anyErr?.status,
+      statusCode: anyErr?.statusCode,
+      details: anyErr?.details,
+      cause: anyErr?.cause instanceof Error ? anyErr.cause.message : anyErr?.cause,
+    };
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    try {
+      return JSON.parse(JSON.stringify(error));
+    } catch (_) {
+      return { message: String(error) };
+    }
+  }
+
+  return { message: String(error) };
+}
+
+function shutdownGeminiSession(incidentId: string) {
+  const session = geminiSessions.get(incidentId);
+  if (!session) {
+    return;
+  }
+  try {
+    session.close();
+  } catch (error) {
+    logger.warn('Gemini session close failed after send error', {
+      incidentId,
+      error: serializeError(error),
+    });
+  } finally {
+    geminiSessions.delete(incidentId);
+  }
+}
+
 function extractTextFromResponse(response: any): string {
   if (!response) {
     return '';
@@ -228,17 +271,22 @@ function tryParseStreamingJson(text: string): { parsed: any } | { error: string 
 }
 
 async function createGenAiLiveSession(incidentId: string, guestLanguage: string): Promise<BridgeSession> {
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
   logger.info('Initializing Gemini with API Key', {
     incidentId,
     model: process.env.GEMINI_MODEL,
-    hasApiKey: !!process.env.GEMINI_API_KEY,
+    hasApiKey: true,
   });
 
   // Use @google/genai with API key (simpler than Vertex AI)
   const { GoogleGenAI } = await import('@google/genai');
   
   const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey,
   });
 
   // Start a chat session
@@ -368,6 +416,9 @@ export function closeGeminiSession(incidentId: string) {
 }
 
 export async function sendMediaToGemini(incidentId: string, chunk: any) {
+  if (aiFailureRecorded.has(incidentId)) {
+    return;
+  }
   const session = geminiSessions.get(incidentId);
   if (!session) {
     logger.warn('Gemini media send skipped - no session', { incidentId, hasSession: false });
@@ -383,8 +434,16 @@ export async function sendMediaToGemini(incidentId: string, chunk: any) {
     await session.sendMedia(chunk);
     logger.debug('Media sent to Gemini successfully', { incidentId, chunkIndex: chunk.chunkIndex });
   } catch (error) {
-    logger.error('Gemini media send failed', { incidentId, error });
-    await recordAiUnavailable(incidentId, error);
+    const err = serializeError(error);
+    logger.error('Gemini media send failed', {
+      incidentId,
+      chunkIndex: chunk?.chunkIndex,
+      hasVideo: !!chunk?.video,
+      hasAudio: !!chunk?.audio,
+      error: err,
+    });
+    await recordAiUnavailable(incidentId, err.message || String(error));
+    shutdownGeminiSession(incidentId);
   }
 }
 

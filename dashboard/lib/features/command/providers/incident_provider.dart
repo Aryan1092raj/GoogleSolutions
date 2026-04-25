@@ -246,12 +246,58 @@ class StaffProfile {
   final String uid;
   final String hotelId;
   final String role;
-  StaffProfile({required this.uid, required this.hotelId, required this.role});
+  const StaffProfile({
+    required this.uid,
+    required this.hotelId,
+    required this.role,
+  });
+
+  static const empty = StaffProfile(uid: '', hotelId: '', role: '');
 }
 
 final staffProfileProvider = StateProvider<StaffProfile>((ref) {
-  return StaffProfile(uid: '', hotelId: '', role: '');
+  return StaffProfile.empty;
 });
+
+const _allowedStaffRoles = <String>{
+  'SECURITY',
+  'MANAGER',
+  'FIRST_RESPONDER',
+};
+
+Future<StaffProfile> resolveStaffProfile(
+  User user, {
+  StaffProfile? fallbackProfile,
+}) async {
+  final token = await user.getIdTokenResult();
+  final claims = token.claims ?? const <String, dynamic>{};
+
+  var hotelId = _asString(claims['hotelId'], fallbackProfile?.hotelId ?? '');
+  var role = _normalizeStaffRole(
+    _asString(claims['role'], fallbackProfile?.role ?? ''),
+  );
+
+  if (hotelId.isEmpty || role.isEmpty) {
+    final profileDoc = await FirebaseFirestore.instance
+        .collection('staff_profiles')
+        .doc(user.uid)
+        .get();
+    final profileData = profileDoc.data() ?? const <String, dynamic>{};
+
+    if (hotelId.isEmpty) {
+      hotelId = _asString(profileData['hotelId']);
+    }
+    if (role.isEmpty) {
+      role = _normalizeStaffRole(_asString(profileData['role']));
+    }
+  }
+
+  return StaffProfile(
+    uid: user.uid,
+    hotelId: hotelId,
+    role: role,
+  );
+}
 
 final incidentListProvider = StreamProvider<List<LiveIncidentCard>>((ref) {
   final profile = ref.watch(staffProfileProvider);
@@ -285,21 +331,21 @@ final incidentListProvider = StreamProvider<List<LiveIncidentCard>>((ref) {
 final incidentHistoryProvider =
     StreamProvider<List<IncidentHistoryRecord>>((ref) {
   final profile = ref.watch(staffProfileProvider);
+  final user = FirebaseAuth.instance.currentUser;
+
+  if (user == null || profile.hotelId.isEmpty) {
+    return Stream<List<IncidentHistoryRecord>>.value(const []);
+  }
 
   return FirebaseFirestore.instance
       .collection('incidents')
-      .orderBy('updatedAt', descending: true)
+      .where('hotelId', isEqualTo: profile.hotelId)
       .limit(300)
       .snapshots()
       .map((snapshot) {
     final records = snapshot.docs
         .map((doc) => IncidentHistoryRecord.fromFirestore(doc.id, doc.data()))
-        .where((record) {
-      if (profile.hotelId.isEmpty) {
-        return true;
-      }
-      return record.hotelId == profile.hotelId;
-    }).toList();
+        .toList();
 
     records.sort((a, b) {
       return b.updatedAtMs.compareTo(a.updatedAtMs);
@@ -349,7 +395,15 @@ Future<void> markStaffOnline(StaffProfile profile,
 Future<void> syncStaffAccessProfile(StaffProfile profile,
     {required String email}) async {
   final user = FirebaseAuth.instance.currentUser;
-  if (user == null || profile.hotelId.isEmpty) {
+  if (user == null) {
+    return;
+  }
+
+  final resolvedProfile =
+      await resolveStaffProfile(user, fallbackProfile: profile);
+
+  if (resolvedProfile.hotelId.isEmpty ||
+      !_allowedStaffRoles.contains(resolvedProfile.role)) {
     return;
   }
 
@@ -357,8 +411,8 @@ Future<void> syncStaffAccessProfile(StaffProfile profile,
       .collection('staff_profiles')
       .doc(user.uid)
       .set({
-    'hotelId': profile.hotelId,
-    'role': profile.role,
+    'hotelId': resolvedProfile.hotelId,
+    'role': resolvedProfile.role,
     'email': email,
     'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
   }, SetOptions(merge: true));
@@ -466,3 +520,9 @@ List<String> _extractHazards(dynamic value) {
   }
   return hazards;
 }
+
+String _normalizeStaffRole(String value) {
+  final role = value.trim().toUpperCase();
+  return _allowedStaffRoles.contains(role) ? role : '';
+}
+

@@ -1,0 +1,4 @@
+storeFile=../keystores/resqlink-release.jks
+storePassword=change-me
+keyAlias=resqlink
+keyPassword=change-me
