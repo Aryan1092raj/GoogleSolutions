@@ -119,9 +119,11 @@ class CameraService {
   final AudioChunkSource _audioSource;
   final CapturePermissionGate _permissionGate;
 
+  String? _latestFrameBase64;
   bool _streaming = false;
   bool _audioStreaming = false;
   bool _imageStreamStarted = false;
+  int _lastStreamFrameAtMs = 0;
 
   Future<void> initialize() async {
     if (_controller != null && _controller!.value.isInitialized) {
@@ -151,7 +153,7 @@ class CameraService {
       cameras.first,
       ResolutionPreset.low,
       enableAudio: true,
-      imageFormatGroup: ImageFormatGroup.yuv420,
+      imageFormatGroup: _preferredImageFormatGroup,
     );
 
     try {
@@ -171,12 +173,37 @@ class CameraService {
       return;
     }
     _streaming = true;
+    _latestFrameBase64 = null;
+    _lastStreamFrameAtMs = 0;
     unawaited(_ensureAudioStarted());
 
-    // Use still JPEG capture in the periodic loop for consistent payload format.
     _imageStreamStarted = false;
     if (kIsWeb) {
       return;
+    }
+
+    if (!_supportsDisplayableImageStreaming) {
+      return;
+    }
+
+    try {
+      await _controller!.startImageStream((CameraImage image) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - _lastStreamFrameAtMs < AppConstants.mediaChunkIntervalMs) {
+          return;
+        }
+
+        final encoded = encodeDisplayableStreamFrame(image);
+        if (encoded == null || encoded.isEmpty) {
+          return;
+        }
+
+        _lastStreamFrameAtMs = now;
+        _latestFrameBase64 = encoded;
+      });
+      _imageStreamStarted = true;
+    } on CameraException {
+      _imageStreamStarted = false;
     }
   }
 
@@ -186,6 +213,8 @@ class CameraService {
       return;
     }
     _streaming = false;
+    _latestFrameBase64 = null;
+    _lastStreamFrameAtMs = 0;
 
     if (_imageStreamStarted) {
       try {
@@ -197,10 +226,14 @@ class CameraService {
   }
 
   Future<String> captureFrame() async {
-    // Fallback to single capture
     if (_controller == null || !_controller!.value.isInitialized) {
       await initialize();
     }
+
+    if (_imageStreamStarted) {
+      return _latestFrameBase64 ?? '';
+    }
+
     final file = await _controller!.takePicture();
     final bytes = await file.readAsBytes();
     return base64Encode(bytes);
@@ -260,6 +293,15 @@ class CameraService {
     await _audioSource.stop();
   }
 
+  @visibleForTesting
+  String? encodeDisplayableStreamFrame(CameraImage image) {
+    if (image.format.group != ImageFormatGroup.jpeg || image.planes.isEmpty) {
+      return null;
+    }
+
+    return base64Encode(image.planes.first.bytes);
+  }
+
   String _encodePcm16ChunkAsWavBase64(String pcmBase64) {
     final pcmBytes = base64Decode(pcmBase64);
     if (pcmBytes.isEmpty) {
@@ -286,5 +328,24 @@ class CameraService {
     header.setUint32(40, pcmBytes.length, Endian.little);
 
     return base64Encode(wavBytes);
+  }
+
+  ImageFormatGroup get _preferredImageFormatGroup {
+    if (kIsWeb) {
+      return ImageFormatGroup.jpeg;
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return ImageFormatGroup.jpeg;
+      case TargetPlatform.iOS:
+        return ImageFormatGroup.bgra8888;
+      default:
+        return ImageFormatGroup.yuv420;
+    }
+  }
+
+  bool get _supportsDisplayableImageStreaming {
+    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   }
 }

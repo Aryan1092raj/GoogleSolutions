@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:camera/camera.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:resqlink_mobile/services/camera_service.dart';
 
@@ -28,6 +30,52 @@ void main() {
     final result = await service.captureAudio();
 
     expect(result, isEmpty);
+  });
+
+  test('encodeDisplayableStreamFrame converts jpeg stream bytes into relayable base64', () {
+    final service = CameraService(audioSource: _FakeAudioChunkSource(chunk: ''));
+    // ignore: deprecated_member_use
+    final image = CameraImage.fromPlatformData({
+      'format': 256,
+      'height': 1,
+      'width': 1,
+      'planes': [
+        {
+          'bytes': Uint8List.fromList(const [9, 8, 7]),
+          'bytesPerRow': 3,
+          'bytesPerPixel': 3,
+          'height': 1,
+          'width': 1,
+        },
+      ],
+    });
+
+    final result = service.encodeDisplayableStreamFrame(image);
+
+    expect(result, base64Encode(const [9, 8, 7]));
+  });
+
+  test('encodeDisplayableStreamFrame ignores unsupported raw frame formats', () {
+    final service = CameraService(audioSource: _FakeAudioChunkSource(chunk: ''));
+    // ignore: deprecated_member_use
+    final image = CameraImage.fromPlatformData({
+      'format': 35,
+      'height': 1,
+      'width': 1,
+      'planes': [
+        {
+          'bytes': Uint8List.fromList(const [1, 2, 3]),
+          'bytesPerRow': 3,
+          'bytesPerPixel': 1,
+          'height': 1,
+          'width': 1,
+        },
+      ],
+    });
+
+    final result = service.encodeDisplayableStreamFrame(image);
+
+    expect(result, isNull);
   });
 }
 

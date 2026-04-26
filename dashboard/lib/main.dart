@@ -122,7 +122,7 @@ class DashboardApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'ResQLink Dashboard',
+      title: 'ResQLink',
       debugShowCheckedModeBanner: false,
       routerConfig: dashboardRouter,
       theme: buildDashboardTheme(),

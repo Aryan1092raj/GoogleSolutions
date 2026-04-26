@@ -1,11 +1,11 @@
 {
-    "name": "resqlink_mobile",
-    "short_name": "resqlink_mobile",
+    "name": "ResQLink",
+    "short_name": "ResQLink",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "ResQLink guest safety app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
