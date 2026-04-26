@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResQLink — Command Center</title>
+  <meta name="description" content="Real-time hotel emergency response command center for security operations.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- TOP BAR -->
+  <header class="topbar" id="topbar">
+    <div class="topbar__left">
+      <div class="topbar__logo" id="logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span class="topbar__brand">ResQLink</span>
+      </div>
+    </div>
+    <div class="topbar__center">
+      <div class="topbar__search" id="search-bar">
+        <svg class="topbar__search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="Search incidents, rooms, responders…" class="topbar__search-input" id="search-input" autocomplete="off">
+        <kbd class="topbar__kbd">/</kbd>
+      </div>
+    </div>
+    <div class="topbar__right">
+      <button class="topbar__icon-btn" id="btn-notifications" aria-label="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="topbar__badge topbar__badge--critical">3</span>
+      </button>
+      <button class="topbar__icon-btn" id="btn-connection" aria-label="Connection Status">
+        <span class="status-dot status-dot--online"></span>
+      </button>
+      <div class="topbar__avatar" id="user-avatar">SM</div>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <div class="layout" id="layout">
+    <!-- LEFT SIDEBAR -->
+    <nav class="sidebar" id="sidebar" aria-label="Main navigation">
+      <div class="sidebar__nav">
+        <a href="#" class="sidebar__item sidebar__item--active" id="nav-dashboard" data-tooltip="Command Center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </a>
+        <a href="#" class="sidebar__item" id="nav-incidents" data-tooltip="Incidents">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </a>
+        <a href="#" class="sidebar__item" id="nav-map" data-tooltip="Live Map">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        </a>
+        <a href="#" class="sidebar__item" id="nav-video" data-tooltip="Video Monitor">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        </a>
+        <a href="#" class="sidebar__item" id="nav-ai" data-tooltip="AI Analysis">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14h.01"/><path d="M8 14h.01"/><path d="M12 17v3"/><path d="M7 20h10"/><circle cx="12" cy="12" r="10"/></svg>
+        </a>
+        <a href="#" class="sidebar__item" id="nav-responders" data-tooltip="Responders">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </a>
+      </div>
+      <div class="sidebar__bottom">
+        <a href="#" class="sidebar__item" id="nav-settings" data-tooltip="Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </a>
+      </div>
+    </nav>
+
+    <!-- MAIN PANEL -->
+    <main class="main-panel" id="main-panel">
+      <!-- STATS BAR -->
+      <section class="stats-bar" id="stats-bar" aria-label="Incident statistics">
+        <div class="stat" id="stat-active">
+          <span class="stat__label">ACTIVE</span>
+          <span class="stat__value">12</span>
+        </div>
+        <div class="stat stat--critical" id="stat-critical">
+          <span class="stat__label">CRITICAL</span>
+          <span class="stat__value stat__value--critical">3</span>
+        </div>
+        <div class="stat" id="stat-high">
+          <span class="stat__label">HIGH</span>
+          <span class="stat__value stat__value--high">5</span>
+        </div>
+        <div class="stat" id="stat-response">
+          <span class="stat__label">AVG RESPONSE</span>
+          <span class="stat__value">2m 14s</span>
+        </div>
+        <div class="stat" id="stat-today">
+          <span class="stat__label">TODAY</span>
+          <span class="stat__value">47</span>
+        </div>
+      </section>
+
+      <!-- CRITICAL ALERT BANNER -->
+      <div class="alert-banner alert-banner--critical" id="critical-alert" role="alert" aria-live="assertive">
+        <div class="alert-banner__icon">
+          <span class="severity-shape severity-shape--critical">▲</span>
+        </div>
+        <div class="alert-banner__content">
+          <span class="alert-banner__title">3 Critical Incidents Require Immediate Response</span>
+          <span class="alert-banner__meta">SOS-0847 · SOS-0852 · SOS-0855 — Oldest unacknowledged: 2m 38s</span>
+        </div>
+        <button class="btn btn--ghost alert-banner__action" id="btn-view-critical">View All</button>
+      </div>
+
+      <!-- INCIDENT LIST -->
+      <section class="incident-list" id="incident-list" aria-label="Active incidents">
+        <div class="incident-list__header">
+          <h2 class="incident-list__title">Active Incidents</h2>
+          <div class="incident-list__filters">
+            <button class="filter-pill filter-pill--active" id="filter-all">All</button>
+            <button class="filter-pill" id="filter-critical">Critical</button>
+            <button class="filter-pill" id="filter-high">High</button>
+            <button class="filter-pill" id="filter-medium">Medium</button>
+          </div>
+        </div>
+
+        <!-- Incident Cards -->
+        <div class="incident-list__cards" id="incident-cards">
+          <!-- Card 1: Critical -->
+          <article class="incident-card incident-card--critical incident-card--selected" id="incident-0847" tabindex="0" aria-label="Critical incident SOS-0847">
+            <div class="incident-card__header">
+              <div class="severity-badge severity-badge--critical">
+                <span class="severity-badge__shape">▲</span>
+                <span class="severity-badge__text">CRITICAL</span>
+              </div>
+              <span class="incident-card__id">SOS-0847</span>
+              <span class="incident-card__time">2m ago</span>
+            </div>
+            <h3 class="incident-card__title">Medical Emergency — Room 412</h3>
+            <p class="incident-card__desc">Guest reports chest pain, requesting immediate medical assistance. Guest age: 67.</p>
+            <div class="incident-card__meta">
+              <span class="incident-card__tag incident-card__tag--live">
+                <span class="live-dot"></span>
+                Live Video
+              </span>
+              <span class="incident-card__tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Floor 4, Wing B
+              </span>
+            </div>
+            <div class="incident-card__actions">
+              <button class="btn btn--primary btn--sm" id="btn-ack-0847">Acknowledge</button>
+              <button class="btn btn--ghost btn--sm" id="btn-assign-0847">Assign</button>
+            </div>
+          </article>
+
+          <!-- Card 2: Critical -->
+          <article class="incident-card incident-card--critical" id="incident-0852" tabindex="0" aria-label="Critical incident SOS-0852">
+            <div class="incident-card__header">
+              <div class="severity-badge severity-badge--critical">
+                <span class="severity-badge__shape">▲</span>
+                <span class="severity-badge__text">CRITICAL</span>
+              </div>
+              <span class="incident-card__id">SOS-0852</span>
+              <span class="incident-card__time">47s ago</span>
+            </div>
+            <h3 class="incident-card__title">Fire Alarm — Floor 6 East</h3>
+            <p class="incident-card__desc">Smoke detector triggered in hallway near Room 618. No visual confirmation yet.</p>
+            <div class="incident-card__meta">
+              <span class="incident-card__tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Floor 6, Wing E
+              </span>
+            </div>
+            <div class="incident-card__actions">
+              <button class="btn btn--primary btn--sm" id="btn-ack-0852">Acknowledge</button>
+              <button class="btn btn--ghost btn--sm" id="btn-assign-0852">Assign</button>
+            </div>
+          </article>
+
+          <!-- Card 3: Critical -->
+          <article class="incident-card incident-card--critical" id="incident-0855" tabindex="0" aria-label="Critical incident SOS-0855">
+            <div class="incident-card__header">
+              <div class="severity-badge severity-badge--critical">
+                <span class="severity-badge__shape">▲</span>
+                <span class="severity-badge__text">CRITICAL</span>
+              </div>
+              <span class="incident-card__id">SOS-0855</span>
+              <span class="incident-card__time">12s ago</span>
+            </div>
+            <h3 class="incident-card__title">SOS Panic — Pool Area</h3>
+            <p class="incident-card__desc">Guest activated SOS from pool deck. Possible drowning situation. Multiple witnesses.</p>
+            <div class="incident-card__meta">
+              <span class="incident-card__tag incident-card__tag--live">
+                <span class="live-dot"></span>
+                Live Video
+              </span>
+              <span class="incident-card__tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Ground Floor, Pool
+              </span>
+            </div>
+            <div class="incident-card__actions">
+              <button class="btn btn--danger btn--sm" id="btn-ack-0855">Respond Now</button>
+              <button class="btn btn--ghost btn--sm" id="btn-assign-0855">Assign</button>
+            </div>
+          </article>
+
+          <!-- Card 4: High -->
+          <article class="incident-card incident-card--high" id="incident-0843" tabindex="0" aria-label="High priority incident INC-0843">
+            <div class="incident-card__header">
+              <div class="severity-badge severity-badge--high">
+                <span class="severity-badge__shape">◆</span>
+                <span class="severity-badge__text">HIGH</span>
+              </div>
+              <span class="incident-card__id">INC-0843</span>
+              <span class="incident-card__time">8m ago</span>
+            </div>
+            <h3 class="incident-card__title">Unauthorized Access — Staff Area B2</h3>
+            <p class="incident-card__desc">Keycard reader flagged unrecognized badge in restricted basement area. CCTV confirms unknown individual.</p>
+            <div class="incident-card__meta">
+              <span class="incident-card__tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Basement 2
+              </span>
+            </div>
+            <div class="incident-card__actions">
+              <button class="btn btn--primary btn--sm" id="btn-ack-0843">Acknowledge</button>
+              <button class="btn btn--ghost btn--sm" id="btn-assign-0843">Assign</button>
+            </div>
+          </article>
+
+          <!-- Card 5: High -->
+          <article class="incident-card incident-card--high" id="incident-0841" tabindex="0" aria-label="High priority incident INC-0841">
+            <div class="incident-card__header">
+              <div class="severity-badge severity-badge--high">
+                <span class="severity-badge__shape">◆</span>
+                <span class="severity-badge__text">HIGH</span>
+              </div>
+              <span class="incident-card__id">INC-0841</span>
+              <span class="incident-card__time">12m ago</span>
+            </div>
+            <h3 class="incident-card__title">Aggressive Guest — Lobby Bar</h3>
+            <p class="incident-card__desc">Bartender reports intoxicated guest becoming aggressive toward staff. Two security requested.</p>
+            <div class="incident-card__meta">
+              <span class="incident-card__tag incident-card__tag--live">
+                <span class="live-dot"></span>
+                Live Video
+              </span>
+              <span class="incident-card__tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Ground Floor, Lobby
+              </span>
+            </div>
+            <div class="incident-card__actions">
+              <button class="btn btn--primary btn--sm" id="btn-ack-0841">Acknowledge</button>
+              <button class="btn btn--ghost btn--sm" id="btn-assign-0841">Assign</button>
+            </div>
+          </article>
+
+          <!-- Card 6: Medium -->
+          <article class="incident-card incident-card--medium" id="incident-0839" tabindex="0" aria-label="Medium incident INC-0839">
+            <div class="incident-card__header">
+              <div class="severity-badge severity-badge--medium">
+                <span class="severity-badge__shape">●</span>
+                <span class="severity-badge__text">MEDIUM</span>
+              </div>
+              <span class="incident-card__id">INC-0839</span>
+              <span class="incident-card__time">18m ago</span>
+            </div>
+            <h3 class="incident-card__title">Noise Complaint — Room 307</h3>
+            <p class="incident-card__desc">Adjacent guest (Room 308) reports excessive noise. Third complaint this evening.</p>
+            <div class="incident-card__meta">
+              <span class="incident-card__tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Floor 3, Wing A
+              </span>
+            </div>
+            <div class="incident-card__actions">
+              <button class="btn btn--primary btn--sm" id="btn-ack-0839">Acknowledge</button>
+              <button class="btn btn--ghost btn--sm" id="btn-assign-0839">Assign</button>
+            </div>
+          </article>
+
+          <!-- Card 7: Medium -->
+          <article class="incident-card incident-card--medium" id="incident-0836" tabindex="0" aria-label="Medium incident INC-0836">
+            <div class="incident-card__header">
+              <div class="severity-badge severity-badge--medium">
+                <span class="severity-badge__shape">●</span>
+                <span class="severity-badge__text">MEDIUM</span>
+              </div>
+              <span class="incident-card__id">INC-0836</span>
+              <span class="incident-card__time">24m ago</span>
+            </div>
+            <h3 class="incident-card__title">Water Leak Detected — Room 512</h3>
+            <p class="incident-card__desc">IoT sensor triggered water leak alert in bathroom. Maintenance dispatched.</p>
+            <div class="incident-card__meta">
+              <span class="incident-card__tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Floor 5, Wing A
+              </span>
+            </div>
+            <div class="incident-card__actions">
+              <button class="btn btn--primary btn--sm" id="btn-ack-0836">Acknowledge</button>
+              <button class="btn btn--ghost btn--sm" id="btn-assign-0836">Assign</button>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <!-- RIGHT PANEL -->
+    <aside class="right-panel" id="right-panel" aria-label="Incident details">
+      <!-- Incident Header -->
+      <div class="detail-header" id="detail-header">
+        <div class="detail-header__top">
+          <div class="severity-badge severity-badge--critical">
+            <span class="severity-badge__shape">▲</span>
+            <span class="severity-badge__text">CRITICAL</span>
+          </div>
+          <span class="detail-header__id">SOS-0847</span>
+        </div>
+        <h2 class="detail-header__title">Medical Emergency — Room 412</h2>
+        <div class="detail-header__meta">
+          <span class="detail-header__meta-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Started 2m 38s ago
+          </span>
+          <span class="detail-header__meta-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Floor 4, Wing B, Room 412
+          </span>
+        </div>
+      </div>
+
+      <!-- AI Analysis -->
+      <div class="ai-analysis" id="ai-analysis">
+        <div class="ai-analysis__header">
+          <span class="ai-analysis__icon">⚡</span>
+          <span class="ai-analysis__label">AI ANALYSIS</span>
+          <span class="ai-analysis__confidence">92% confidence</span>
+        </div>
+        <div class="ai-analysis__threat">
+          <span class="ai-analysis__threat-label">Threat Assessment:</span>
+          <span class="ai-analysis__threat-value ai-analysis__threat-value--high">HIGH</span>
+        </div>
+        <p class="ai-analysis__body">
+          The reported chest pain combined with guest age (67) suggests potential cardiac event. 
+          Recommend immediate medical dispatch and AED preparation. Historical data shows Room 412 
+          guest checked in with mobility assistance request.
+        </p>
+        <div class="ai-analysis__actions-label">Recommended Actions:</div>
+        <ul class="ai-analysis__recommendations">
+          <li>Dispatch medical team to Floor 4 immediately</li>
+          <li>Prepare AED — nearest unit: Floor 4 elevator lobby</li>
+          <li>Alert front desk to guide EMS upon arrival</li>
+          <li>Notify hotel manager on duty</li>
+        </ul>
+        <div class="ai-analysis__buttons">
+          <button class="btn btn--primary btn--sm" id="btn-apply-ai">Apply All</button>
+          <button class="btn btn--ghost btn--sm" id="btn-dismiss-ai">Dismiss</button>
+        </div>
+        <div class="ai-analysis__footer">
+          <span>⚡ Powered by Gemini</span>
+        </div>
+      </div>
+
+      <!-- Video Preview -->
+      <div class="video-preview" id="video-preview">
+        <div class="video-preview__header">
+          <span class="video-preview__label">LIVE FEED</span>
+          <span class="video-preview__badge">
+            <span class="live-dot"></span>
+            LIVE
+          </span>
+        </div>
+        <div class="video-preview__container">
+          <div class="video-preview__placeholder">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#62666d" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            <span class="video-preview__status">Room 412 — Camera Feed</span>
+            <div class="video-preview__simulated">
+              <div class="video-preview__scanline"></div>
+            </div>
+          </div>
+          <div class="video-preview__controls">
+            <button class="btn btn--ghost btn--icon" id="btn-video-mute" aria-label="Mute">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            </button>
+            <button class="btn btn--ghost btn--icon" id="btn-video-screenshot" aria-label="Screenshot">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+            <button class="btn btn--ghost btn--icon" id="btn-video-fullscreen" aria-label="Fullscreen">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="timeline" id="timeline">
+        <div class="timeline__header">
+          <span class="timeline__label">TIMELINE</span>
+        </div>
+        <div class="timeline__items">
+          <div class="timeline__item">
+            <div class="timeline__dot timeline__dot--ai"></div>
+            <div class="timeline__content">
+              <span class="timeline__event">🤖 AI Analysis completed — HIGH threat</span>
+              <span class="timeline__time">10s ago</span>
+            </div>
+          </div>
+          <div class="timeline__item">
+            <div class="timeline__dot timeline__dot--stream"></div>
+            <div class="timeline__content">
+              <span class="timeline__event">Video stream activated from Room 412</span>
+              <span class="timeline__time">35s ago</span>
+            </div>
+          </div>
+          <div class="timeline__item">
+            <div class="timeline__dot timeline__dot--alert"></div>
+            <div class="timeline__content">
+              <span class="timeline__event">SOS triggered by Guest — Raj Patel</span>
+              <span class="timeline__time">2m 38s ago</span>
+            </div>
+          </div>
+          <div class="timeline__item">
+            <div class="timeline__dot"></div>
+            <div class="timeline__content">
+              <span class="timeline__event">Incident auto-classified as CRITICAL</span>
+              <span class="timeline__time">2m 38s ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assigned Responders -->
+      <div class="responders" id="responders">
+        <div class="responders__header">
+          <span class="responders__label">ASSIGNED RESPONDERS</span>
+          <button class="btn btn--ghost btn--xs" id="btn-add-responder">+ Add</button>
+        </div>
+        <div class="responders__list">
+          <div class="responder">
+            <div class="responder__avatar">AK</div>
+            <div class="responder__info">
+              <span class="responder__name">Arun Kumar</span>
+              <span class="responder__role">Security Lead</span>
+            </div>
+            <span class="status-dot status-dot--busy" title="En route"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Bar -->
+      <div class="action-bar" id="action-bar">
+        <button class="btn btn--danger btn--full" id="btn-escalate">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Escalate
+        </button>
+        <button class="btn btn--success btn--full" id="btn-resolve">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Resolve
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- STATUS BAR -->
+  <footer class="statusbar" id="statusbar">
+    <div class="statusbar__left">
+      <span class="statusbar__item">
+        <span class="status-dot status-dot--online"></span>
+        WebSocket Connected
+      </span>
+      <span class="statusbar__divider"></span>
+      <span class="statusbar__item">Last sync: <span class="statusbar__mono">2s ago</span></span>
+    </div>
+    <div class="statusbar__right">
+      <span class="statusbar__item">Active Responders: <strong>8</strong></span>
+      <span class="statusbar__divider"></span>
+      <span class="statusbar__item statusbar__mono">v2.4.1</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

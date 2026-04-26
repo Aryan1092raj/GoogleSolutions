@@ -56,11 +56,13 @@ export interface Incident {
   severity: IncidentSeverity;
   aiStatus: AiStatus;
   aiSummary: string;
+  guestStatusMessage?: string;
   translatedTranscript: string;
   originalTranscript: string;
   detectedLanguage: string;
   streamSessionId: string;
   isStreamLive: boolean;
+  helpOnWay: boolean;
   recordingGcsPath?: string;
   acknowledgedBy?: string;
   etaMinutes?: number;
@@ -146,11 +148,13 @@ export const incidentSchema = z.object({
   severity: incidentSeveritySchema, 
   aiStatus: aiStatusSchema,
   aiSummary: z.string(), 
+  guestStatusMessage: z.string().optional(),
   translatedTranscript: z.string(), 
   originalTranscript: z.string(), 
   detectedLanguage: z.string(), 
   streamSessionId: z.string(), 
   isStreamLive: z.boolean(), 
+  helpOnWay: z.boolean(),
   recordingGcsPath: z.string().optional(), 
   acknowledgedBy: z.string().optional(), 
   responderLog: z.array(responderLogEntrySchema), 

@@ -85,7 +85,10 @@ export async function handleSosMessage(ws, rawMessage, incidentIdFromConnection)
     try {
       await openGeminiSession(msg.payload.incidentId, msg.payload.guestLanguage);
     } catch (error) {
-      sendWsError(msg.payload.incidentId, 'GEMINI_UNAVAILABLE', 'Gemini session open failed', true);
+      logger.warn('Gemini session unavailable for SOS session', {
+        incidentId: msg.payload.incidentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     await fcmService.alertAllStaff(msg.payload.hotelId, incident);

@@ -4,13 +4,15 @@ import 'package:flutter/material.dart';
 Color severityColor(String s) {
   switch (s.toUpperCase()) {
     case 'CRITICAL':
-      return const Color(0xFFFF3B30);
+      return const Color(0xFFEF4444);
     case 'HIGH':
-      return const Color(0xFFFF6B35);
+      return const Color(0xFFF59E0B);
     case 'MEDIUM':
-      return const Color(0xFFFFCC00);
+      return const Color(0xFF3B82F6);
+    case 'LOW':
+      return const Color(0xFF8A8F98);
     default:
-      return const Color(0xFF26A69A);
+      return const Color(0xFF22C55E);
   }
 }
 

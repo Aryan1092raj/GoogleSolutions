@@ -5,6 +5,7 @@ import 'dart:io' show SocketException;
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -20,6 +21,18 @@ import '../../../services/sos_queue_service.dart';
 
 enum SOSStatus { idle, initiating, active, resolving, resolved, error, queued }
 
+class GuestIncidentUpdate {
+  final String title;
+  final String detail;
+  final String timestamp;
+
+  const GuestIncidentUpdate({
+    required this.title,
+    required this.detail,
+    required this.timestamp,
+  });
+}
+
 class SOSState {
   final SOSStatus status;
   final String? incidentId;
@@ -28,6 +41,7 @@ class SOSState {
   final bool helpOnWay;
   final int? etaMinutes;
   final String? error;
+  final List<GuestIncidentUpdate> recentUpdates;
 
   const SOSState({
     required this.status,
@@ -37,6 +51,7 @@ class SOSState {
     required this.helpOnWay,
     this.etaMinutes,
     this.error,
+    this.recentUpdates = const [],
   });
 
   SOSState copyWith({
@@ -47,6 +62,7 @@ class SOSState {
     bool? helpOnWay,
     int? etaMinutes,
     String? error,
+    List<GuestIncidentUpdate>? recentUpdates,
   }) {
     return SOSState(
       status: status ?? this.status,
@@ -56,6 +72,7 @@ class SOSState {
       helpOnWay: helpOnWay ?? this.helpOnWay,
       etaMinutes: etaMinutes ?? this.etaMinutes,
       error: error ?? this.error,
+      recentUpdates: recentUpdates ?? this.recentUpdates,
     );
   }
 }
@@ -82,6 +99,8 @@ class SOSNotifier extends StateNotifier<SOSState> {
   final LocationService _location;
   final Ref _ref;
   StreamSubscription<Map<String, dynamic>>? _sub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _incidentSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _locationTimer;
   Timer? _pingTimer;
@@ -236,6 +255,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
     );
 
     _startLiveMetadataUpdates(incidentId);
+    _attachIncidentSync(incidentId);
     if (!mounted) return;
     state = state.copyWith(status: SOSStatus.active, incidentId: incidentId);
   }
@@ -310,6 +330,13 @@ class SOSNotifier extends StateNotifier<SOSState> {
     state = current.copyWith(status: SOSStatus.resolving);
   }
 
+  void observeIncident(String incidentId) {
+    if (incidentId.trim().isEmpty) {
+      return;
+    }
+    _attachIncidentSync(incidentId);
+  }
+
   void _handleWsMessage(Map<String, dynamic> msg) {
     // Guard: do not update state if the notifier has been disposed
     if (!mounted || _ignoringIncomingMessages) return;
@@ -336,7 +363,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
 
     if (type == 'SOS_ACCEPTED') {
       if (!mounted) return;
-      state = current.copyWith(status: SOSStatus.active, helpOnWay: true);
+      state = current.copyWith(status: SOSStatus.active);
       return;
     }
 
@@ -358,6 +385,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
   void dispose() {
     _ignoringIncomingMessages = true;
     _sub?.cancel();
+    _incidentSubscription?.cancel();
     _connectivitySub?.cancel();
     _locationTimer?.cancel();
     _pingTimer?.cancel();
@@ -386,6 +414,112 @@ class SOSNotifier extends StateNotifier<SOSState> {
     _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _ws.sendPing();
     });
+  }
+
+  void _attachIncidentSync(String incidentId) {
+    _incidentSubscription?.cancel();
+    _incidentSubscription = FirebaseFirestore.instance
+        .collection('incidents')
+        .doc(incidentId)
+        .snapshots()
+        .listen(_applyIncidentSnapshot);
+  }
+
+  void _applyIncidentSnapshot(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    if (!mounted || _ignoringIncomingMessages || !snapshot.exists) {
+      return;
+    }
+
+    final data = snapshot.data() ?? const <String, dynamic>{};
+    final status = data['status']?.toString().toUpperCase() ?? 'ACTIVE';
+    final severity = data['severity']?.toString().toUpperCase();
+    final guestStatusMessage = data['guestStatusMessage']?.toString();
+    final aiSummary = data['aiSummary']?.toString();
+    final aiStatus = data['aiStatus']?.toString().toUpperCase() ?? 'PENDING';
+    final etaMinutes = _readPositiveInt(data['etaMinutes']);
+    final helpOnWay = data['helpOnWay'] == true || status == 'ACKNOWLEDGED';
+    final updates = _extractRecentUpdates(data['actionHistory']);
+    final current = state;
+
+    if (status == 'RESOLVED' || status == 'FALSE_ALARM') {
+      state = current.copyWith(
+        status: SOSStatus.resolved,
+        severity: severity,
+        helpOnWay: false,
+        etaMinutes: etaMinutes,
+        aiMessage: _firstNonEmpty(
+          guestStatusMessage,
+          aiSummary,
+          current.aiMessage,
+        ),
+        recentUpdates: updates,
+      );
+      return;
+    }
+
+    state = current.copyWith(
+      status: current.status == SOSStatus.resolving
+          ? SOSStatus.resolving
+          : SOSStatus.active,
+      severity: severity,
+      helpOnWay: helpOnWay,
+      etaMinutes: etaMinutes,
+      aiMessage: _firstNonEmpty(
+        guestStatusMessage,
+        aiStatus == 'UNAVAILABLE' || aiStatus == 'DEGRADED' ? aiSummary : null,
+        current.aiMessage,
+      ),
+      recentUpdates: updates,
+    );
+  }
+
+  int? _readPositiveInt(dynamic value) {
+    if (value is int) {
+      return value > 0 ? value : null;
+    }
+    if (value is num) {
+      final rounded = value.toInt();
+      return rounded > 0 ? rounded : null;
+    }
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  List<GuestIncidentUpdate> _extractRecentUpdates(dynamic rawHistory) {
+    if (rawHistory is! List) {
+      return const [];
+    }
+
+    return rawHistory
+        .whereType<Map>()
+        .map((entry) => Map<String, dynamic>.from(entry))
+        .where((entry) {
+          final title = entry['title']?.toString().trim().toLowerCase() ?? '';
+          return title != 'sos started';
+        })
+        .toList()
+        .reversed
+        .take(3)
+        .map((entry) => GuestIncidentUpdate(
+              title: entry['title']?.toString() ?? 'Status update',
+              detail: entry['detail']?.toString() ?? '',
+              timestamp: entry['timestamp']?.toString() ?? '',
+            ))
+        .toList(growable: false);
+  }
+
+  String? _firstNonEmpty(String? first, String? second, String? third) {
+    for (final candidate in [first, second, third]) {
+      if (candidate != null && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+    return null;
   }
 }
 

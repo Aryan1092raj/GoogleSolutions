@@ -1,84 +1,65 @@
-// dashboard/lib/core/dashboard_theme.dart
-// Liquid Glass Design System for ResQLink Dashboard
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// ── Liquid Glass Palette ──────────────────────────────────────────────────────
-const kDashBg = Color(0xFF051424);        // Dark Background
-const kDashSurface = Color(0x800A1929);   // Surface with transparency
-const kDashSurface2 = Color(0x0FFFFFFF);  // Glass surface
-const kDashBorder = Color(0x1AFFFFFF);    // rgba(255,255,255,0.10)
-const kDashAccent = Color(0xFF0084FF);    // Primary Brand Blue
-const kDashDanger = Color(0xFFFF3B30);    // Emergency Red
-const kDashWarning = Color(0xFFFFCC00);   // Amber
-const kDashInfo = Color(0xFF3B82F6);      // Blue
-const kDashText = Color(0xFFD5E4FA);      // Primary text
-const kDashTextSub = Color(0xFF7A9BC2);   // Secondary text
-const kDashTextMut = Color(0xFF3D5269);   // Muted
-const kDashGreen = Color(0xFF26A69A);     // Safe Green
-const kGlowBlueLight = Color(0xFF60B1FF);
-const kGlowBlueDeep = Color(0xFF319AFF);
+const kDashBg = Color(0xFF08090A);
+const kDashPanel = Color(0xFF0F1011);
+const kDashSurface = Color(0xFF141516);
+const kDashSurface2 = Color(0xFF191A1B);
+const kDashSurfaceHover = Color(0xFF1E1F21);
+const kDashSurfaceActive = Color(0xFF252628);
 
-// Glass Surface Recipe
-BoxDecoration glassSurfaceDecoration = BoxDecoration(
-  color: const Color(0x0FFFFFFF), // rgba(255,255,255,0.06)
-  borderRadius: BorderRadius.circular(20),
-  border: Border.all(
-    color: const Color(0x1AFFFFFF), // rgba(255,255,255,0.10)
-    width: 1,
-  ),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.4),
-      blurRadius: 32,
-      offset: const Offset(0, 8),
-    ),
-    const BoxShadow(
-      color: Color(0x14FFFFFF),
-      blurRadius: 4,
-      offset: Offset(0, 4),
-      spreadRadius: -4,
-    ),
-  ],
-);
+const kDashBorderSubtle = Color(0x0DFFFFFF);
+const kDashBorder = Color(0x14FFFFFF);
+const kDashBorderEmphasis = Color(0x1FFFFFFF);
 
-// Background Glow Widget
-Widget buildBackgroundGlow({Alignment alignment = Alignment.topLeft}) {
-  return Positioned.fill(
-    child: Align(
-      alignment: alignment,
-      child: Container(
-        width: 500,
-        height: 500,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              kGlowBlueDeep.withValues(alpha: 0.35),
-              kGlowBlueLight.withValues(alpha: 0.25),
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.5, 1.0],
-            radius: 0.6,
-          ),
-        ),
-      ),
+const kDashAccent = Color(0xFF3B82F6);
+const kDashAccentHover = Color(0xFF60A5FA);
+const kDashDanger = Color(0xFFEF4444);
+const kDashWarning = Color(0xFFF59E0B);
+const kDashInfo = Color(0xFF3B82F6);
+const kDashGreen = Color(0xFF22C55E);
+
+const kDashText = Color(0xFFF7F8F8);
+const kDashTextSub = Color(0xFFD0D6E0);
+const kDashTextMut = Color(0xFF8A8F98);
+const kDashTextDim = Color(0xFF62666D);
+
+const kDashTopBarHeight = 48.0;
+const kDashStatusBarHeight = 32.0;
+const kDashNavRailWidth = 64.0;
+
+BoxDecoration get glassSurfaceDecoration => BoxDecoration(
+      color: kDashSurface,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: kDashBorder),
+    );
+
+BoxDecoration dashboardPanelDecoration({
+  Color background = kDashSurface,
+  Color border = kDashBorder,
+  bool selected = false,
+}) {
+  return BoxDecoration(
+    color: selected ? kDashSurfaceActive : background,
+    borderRadius: BorderRadius.circular(8),
+    border: Border.all(
+      color: selected ? kDashBorderEmphasis : border,
     ),
   );
 }
 
-// Severity helpers
 Color severityColor(String s) {
   switch (s.toUpperCase()) {
     case 'CRITICAL':
       return kDashDanger;
     case 'HIGH':
-      return const Color(0xFFFF6B35);
-    case 'MEDIUM':
       return kDashWarning;
-    default:
+    case 'MEDIUM':
+      return kDashInfo;
+    case 'RESOLVED':
       return kDashGreen;
+    default:
+      return kDashTextMut;
   }
 }
 
@@ -89,229 +70,153 @@ Color statusColor(String s) {
     case 'ACKNOWLEDGED':
       return kDashInfo;
     case 'RESOLVED':
+    case 'FALSE_ALARM':
       return kDashGreen;
     default:
-      return kDashTextMut;
+      return kDashTextDim;
   }
 }
 
 ThemeData buildDashboardTheme() {
+  final interText = GoogleFonts.interTextTheme();
   return ThemeData(
     useMaterial3: true,
-    fontFamily: 'Inter',
     scaffoldBackgroundColor: kDashBg,
     colorScheme: const ColorScheme.dark(
       surface: kDashSurface,
       primary: kDashAccent,
-      secondary: kDashInfo,
+      secondary: kDashGreen,
       error: kDashDanger,
       onSurface: kDashText,
     ),
-    appBarTheme: AppBarTheme(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      surfaceTintColor: Colors.transparent,
-      titleTextStyle: GoogleFonts.fustat(
+    textTheme: interText.copyWith(
+      displayLarge: GoogleFonts.inter(
         color: kDashText,
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.4,
+        fontSize: 32,
+        fontWeight: FontWeight.w600,
       ),
-      iconTheme: const IconThemeData(color: kDashText),
-    ),
-    cardTheme: CardThemeData(
-      color: const Color(0x0FFFFFFF),
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: kDashBorder),
-      ),
-    ),
-    dividerTheme: const DividerThemeData(
-      color: kDashBorder,
-      thickness: 1,
-    ),
-    textTheme: TextTheme(
-      displayLarge: GoogleFonts.fustat(
-        color: kDashText,
-        fontSize: 36,
-        fontWeight: FontWeight.w700,
-      ),
-      headlineMedium: GoogleFonts.fustat(
+      headlineLarge: GoogleFonts.inter(
         color: kDashText,
         fontSize: 24,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.4,
       ),
-      titleLarge: GoogleFonts.fustat(
+      headlineMedium: GoogleFonts.inter(
         color: kDashText,
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: FontWeight.w600,
       ),
-      titleMedium: GoogleFonts.fustat(
+      titleLarge: GoogleFonts.inter(
         color: kDashText,
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        letterSpacing: 0.2,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
       ),
       bodyLarge: GoogleFonts.inter(
-        color: kDashText,
+        color: kDashTextSub,
         fontSize: 14,
       ),
       bodyMedium: GoogleFonts.inter(
-        color: kDashText,
+        color: kDashTextSub,
         fontSize: 13,
       ),
       bodySmall: GoogleFonts.inter(
-        color: kDashTextSub,
+        color: kDashTextMut,
         fontSize: 12,
+      ),
+      labelLarge: GoogleFonts.inter(
+        color: kDashText,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
       ),
       labelMedium: GoogleFonts.inter(
         color: kDashTextSub,
         fontSize: 11,
+        fontWeight: FontWeight.w600,
         letterSpacing: 0.5,
       ),
       labelSmall: GoogleFonts.inter(
         color: kDashTextMut,
         fontSize: 10,
+        fontWeight: FontWeight.w600,
         letterSpacing: 1.0,
       ),
     ),
+    dividerTheme: const DividerThemeData(
+      color: kDashBorderSubtle,
+      thickness: 1,
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0x0FFFFFFF),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      fillColor: kDashPanel,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: kDashBorder),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          color: kDashBorder,
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: kDashBorder),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          color: kDashAccent,
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: kDashAccent),
       ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          color: kDashDanger,
-        ),
-      ),
-      labelStyle: GoogleFonts.inter(
-        color: kDashTextSub,
-        fontSize: 13,
-      ),
-      hintStyle: GoogleFonts.inter(
-        color: kDashTextSub.withValues(alpha: 0.5),
-        fontSize: 13,
-      ),
-      prefixIconColor: kDashTextSub,
+      labelStyle: GoogleFonts.inter(color: kDashTextMut, fontSize: 13),
+      hintStyle: GoogleFonts.inter(color: kDashTextDim, fontSize: 13),
+      prefixIconColor: kDashTextMut,
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: kDashAccent.withValues(alpha: 0.8),
+        backgroundColor: kDashAccent,
         foregroundColor: Colors.white,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         textStyle: GoogleFonts.inter(
-          fontSize: 15,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: const Color(0x0FFFFFFF),
+        backgroundColor: kDashSurface2,
         foregroundColor: kDashText,
-        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(6),
           side: const BorderSide(color: kDashBorder),
-        ),
-        textStyle: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
         ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: kDashText,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-        side: const BorderSide(
-          color: Color(0x4DFFFFFF),
-          width: 1,
-        ),
-        textStyle: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
+        foregroundColor: kDashTextSub,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        side: const BorderSide(color: kDashBorder),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: kDashSurface,
-      contentTextStyle: GoogleFonts.inter(
-        color: kDashText,
-        fontSize: 14,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      backgroundColor: kDashSurface2,
+      contentTextStyle: GoogleFonts.inter(color: kDashTextSub, fontSize: 13),
       behavior: SnackBarBehavior.floating,
-    ),
-    dialogTheme: DialogThemeData(
-      backgroundColor: kDashSurface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      titleTextStyle: GoogleFonts.fustat(
-        color: kDashText,
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-      ),
-      contentTextStyle: GoogleFonts.inter(
-        color: kDashTextSub,
-        fontSize: 14,
-      ),
-    ),
-    chipTheme: ChipThemeData(
-      backgroundColor: const Color(0x0FFFFFFF),
-      labelStyle: GoogleFonts.inter(
-        color: kDashText,
-        fontSize: 12,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(
-          color: Color(0x1AFFFFFF),
-          width: 1,
-        ),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ),
     iconTheme: const IconThemeData(
-      color: kDashTextSub,
-      size: 20,
+      color: kDashTextMut,
+      size: 18,
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: kDashPanel,
+      elevation: 0,
+      titleTextStyle: GoogleFonts.inter(
+        color: kDashText,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+      ),
+      iconTheme: const IconThemeData(color: kDashTextSub),
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: kDashAccent,
-      linearTrackColor: kDashSurface,
-      circularTrackColor: kDashSurface,
+      linearTrackColor: kDashPanel,
+      circularTrackColor: kDashPanel,
     ),
   );
 }

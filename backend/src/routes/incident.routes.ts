@@ -3,7 +3,6 @@ import { z } from 'zod';
 import * as firebaseService from '../services/firebase.service';
 import { issueWsToken } from '../websocket/ws-server';
 import { sendToGuest } from '../websocket/ws-server';
-import { isGeminiConfigured } from '../services/gemini.service';
 import { cancelEscalationTimer } from '../services/escalation.service';
  
 const createIncidentSchema = z.object({ 
@@ -43,11 +42,6 @@ incidentRouter.post('/', async function (req, res) {
   const parsed = createIncidentSchema.safeParse(req.body); 
   if (!parsed.success) { 
     res.status(400).json({ error: 'Validation failed' }); 
-    return; 
-  } 
- 
-  if (!isGeminiConfigured()) { 
-    res.status(503).json({ error: 'Gemini service unavailable' }); 
     return; 
   } 
  
@@ -139,6 +133,9 @@ incidentRouter.patch('/:incidentId/status', async function (req, res) {
   // Handle ETA for ACKNOWLEDGED status
   if (parsed.data.status === 'ACKNOWLEDGED') {
     const etaMinutes = parsed.data.etaMinutes;
+    const guestMessage = etaMinutes 
+      ? `Security has acknowledged your SOS. Estimated arrival: ${etaMinutes} minutes.`
+      : 'Security has acknowledged your SOS. Stay calm and keep this feed active.';
     
     // Cancel escalation timer since staff has acknowledged
     cancelEscalationTimer(req.params.incidentId);
@@ -147,15 +144,17 @@ incidentRouter.patch('/:incidentId/status', async function (req, res) {
     if (etaMinutes !== undefined && etaMinutes !== null) {
       await firebaseService.updateIncidentEta(req.params.incidentId, etaMinutes);
     }
+    await firebaseService.updateIncidentGuestState(req.params.incidentId, {
+      guestStatusMessage: guestMessage,
+      helpOnWay: true,
+    });
     
     // Send WS message to guest
     sendToGuest(req.params.incidentId, {
       type: 'AI_STATUS',
       payload: {
         incidentId: req.params.incidentId,
-        message: etaMinutes 
-          ? `Security has acknowledged your SOS. Estimated arrival: ${etaMinutes} minutes.`
-          : 'Security has acknowledged your SOS. Stay calm and keep this feed active.',
+        message: guestMessage,
         severity: updated.severity || incidentBefore?.severity || 'LOW',
         helpOnWay: true,
         estimatedArrivalMin: etaMinutes,
@@ -164,14 +163,19 @@ incidentRouter.patch('/:incidentId/status', async function (req, res) {
   }
 
   if (parsed.data.status === 'RESOLVED' || parsed.data.status === 'FALSE_ALARM') {
+    const guestMessage = parsed.data.status === 'FALSE_ALARM'
+      ? 'Security closed this incident as a false alarm.'
+      : 'Security marked this incident as resolved.';
+    await firebaseService.updateIncidentGuestState(req.params.incidentId, {
+      guestStatusMessage: guestMessage,
+      helpOnWay: false,
+    });
     sendToGuest(req.params.incidentId, {
       type: 'INCIDENT_RESOLVED',
       payload: {
         incidentId: req.params.incidentId,
         resolvedBy: 'staff',
-        message: parsed.data.status === 'FALSE_ALARM'
-            ? 'Security closed this incident as a false alarm.'
-            : 'Security marked this incident as resolved.',
+        message: guestMessage,
       },
     });
   }

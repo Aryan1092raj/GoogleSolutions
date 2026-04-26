@@ -536,6 +536,7 @@ export async function parseGeminiResponse(response: any, incidentId: string) {
     await firebaseService.updateIncidentAnalysis(incidentId, {
       ...analysis,
       aiStatus: 'AVAILABLE',
+      guestStatusMessage: analysis.guestCalm,
     });
     await firebaseService.updateLiveCard(incidentId, analysis);
 

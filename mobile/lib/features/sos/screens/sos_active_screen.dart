@@ -78,6 +78,7 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
   late final AnimationController _slideController;
   late final AnimationController _severityFlashController;
   late final sos_stream.StreamNotifier _streamNotifier;
+  late final SOSNotifier _sosNotifier;
   final _start = DateTime.now();
   bool _streamStartRequested = false;
   String? _previousSeverity;
@@ -94,6 +95,7 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
       vsync: this,
     )..repeat(reverse: true);
     _streamNotifier = ref.read(sos_stream.streamProvider.notifier);
+    _sosNotifier = ref.read(sosProvider.notifier);
 
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 380),
@@ -116,7 +118,11 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
     });
 
     Future.microtask(() async {
-      if (!mounted || _streamStartRequested || !widget.autoStartStreaming) {
+      if (!mounted) {
+        return;
+      }
+      _sosNotifier.observeIncident(widget.incidentId);
+      if (_streamStartRequested || !widget.autoStartStreaming) {
         return;
       }
       _streamStartRequested = true;
@@ -729,6 +735,7 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
             aiMessage: message,
             helpOnWay: state.helpOnWay,
             etaMinutes: state.etaMinutes,
+            recentUpdates: state.recentUpdates,
             hotelId: profile?.hotelId,
             roomNumber: profile?.roomNumber,
           ),

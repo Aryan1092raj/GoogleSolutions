@@ -356,7 +356,8 @@ final incidentHistoryProvider =
 
 final incidentDetailProvider =
     StreamProvider.family<IncidentDetailRecord?, String>((ref, incidentId) {
-  if (incidentId.isEmpty) {
+  final profile = ref.watch(staffProfileProvider);
+  if (incidentId.isEmpty || profile.hotelId.isEmpty) {
     return Stream<IncidentDetailRecord?>.value(null);
   }
 
@@ -370,6 +371,9 @@ final incidentDetailProvider =
     }
     final data = doc.data();
     if (data == null) {
+      return null;
+    }
+    if (_asString(data['hotelId']) != profile.hotelId) {
       return null;
     }
     return IncidentDetailRecord.fromFirestore(doc.id, data);

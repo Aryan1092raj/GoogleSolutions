@@ -5,6 +5,8 @@ import { logger } from '../utils/logger';
 const INCIDENTS_COLLECTION = 'incidents'; 
 const LIVE_INCIDENTS_ROOT = 'live_incidents'; 
 const ACTIVE_LIVE_STATUSES = new Set(['ACTIVE', 'ACKNOWLEDGED']);
+const DEFAULT_GUEST_STATUS_MESSAGE =
+  'SOS received. Stay calm and keep this emergency session open.';
  
 function nowTs() { 
   return admin.firestore.FieldValue.serverTimestamp(); 
@@ -91,11 +93,13 @@ export async function createIncident(input) {
     severity: 'LOW', 
     aiStatus: 'PENDING',
     aiSummary: '', 
+    guestStatusMessage: DEFAULT_GUEST_STATUS_MESSAGE,
     translatedTranscript: '', 
     originalTranscript: '', 
     detectedLanguage: language, 
     streamSessionId: sessionId, 
     isStreamLive: true, 
+    helpOnWay: false,
     recordingGcsPath: input.recordingGcsPath, 
     acknowledgedBy: null, 
     responderLog: [], 
@@ -170,8 +174,8 @@ export async function updateIncidentAnalysis(incidentId, analysis) {
     logger.warn('Incident not found for analysis update', { incidentId }); 
     return null; 
   } 
- 
-  await ref.update({ 
+
+  const updates: any = {
     hazards: Array.isArray(analysis.hazards) ? analysis.hazards : [], 
     severity: analysis.severity ? analysis.severity : 'LOW', 
     aiStatus: analysis.aiStatus ? analysis.aiStatus : 'AVAILABLE',
@@ -180,7 +184,14 @@ export async function updateIncidentAnalysis(incidentId, analysis) {
     originalTranscript: analysis.originalTranscript ? analysis.originalTranscript : '', 
     detectedLanguage: analysis.detectedLanguage ? analysis.detectedLanguage : 'en', 
     updatedAt: nowTs(), 
-  }); 
+  };
+  if (typeof analysis.guestStatusMessage === 'string') {
+    updates.guestStatusMessage = analysis.guestStatusMessage;
+  } else if (typeof analysis.guestCalm === 'string') {
+    updates.guestStatusMessage = analysis.guestCalm;
+  }
+
+  await ref.update(updates); 
  
   const merged = Object.assign({}, snapshot.data(), { 
     hazards: Array.isArray(analysis.hazards) ? analysis.hazards : [], 
@@ -191,6 +202,11 @@ export async function updateIncidentAnalysis(incidentId, analysis) {
     originalTranscript: analysis.originalTranscript ? analysis.originalTranscript : '', 
     detectedLanguage: analysis.detectedLanguage ? analysis.detectedLanguage : 'en', 
   }); 
+  if (typeof analysis.guestStatusMessage === 'string') {
+    merged.guestStatusMessage = analysis.guestStatusMessage;
+  } else if (typeof analysis.guestCalm === 'string') {
+    merged.guestStatusMessage = analysis.guestCalm;
+  }
   await updateLiveCardByIncident(merged); 
   return merged; 
 } 
@@ -239,6 +255,37 @@ export async function updateIncidentAiState(incidentId, aiStatus, aiSummary, det
   return nextIncident;
 }
 
+export async function updateIncidentGuestState(
+  incidentId,
+  payload: {
+    guestStatusMessage?: string;
+    helpOnWay?: boolean;
+  },
+) {
+  const firestore = getFirestore();
+  const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    return null;
+  }
+
+  const incident = snapshot.data();
+  const updates: any = {
+    updatedAt: nowTs(),
+  };
+  if (typeof payload.guestStatusMessage === 'string') {
+    updates.guestStatusMessage = payload.guestStatusMessage;
+  }
+  if (typeof payload.helpOnWay === 'boolean') {
+    updates.helpOnWay = payload.helpOnWay;
+  }
+
+  await ref.update(updates);
+  const nextIncident = Object.assign({}, incident, updates);
+  await updateLiveCardByIncident(nextIncident);
+  return nextIncident;
+}
+
 export async function updateIncidentStatus(incidentId, status, staffId, note, staffName) {
   const firestore = getFirestore();
   const ref = firestore.collection(INCIDENTS_COLLECTION).doc(incidentId);
@@ -252,15 +299,18 @@ export async function updateIncidentStatus(incidentId, status, staffId, note, st
   if (status === 'RESOLVED') {
     updates.resolvedAt = nowTs();
     updates.isStreamLive = false;
+    updates.helpOnWay = false;
   }
   if (status === 'FALSE_ALARM') {
     updates.resolvedAt = nowTs();
     updates.isStreamLive = false;
+    updates.helpOnWay = false;
   }
   if (status === 'ACKNOWLEDGED') {
     if (staffId) {
       updates.acknowledgedBy = staffId;
     }
+    updates.helpOnWay = true;
   }
 
   await ref.update(updates);

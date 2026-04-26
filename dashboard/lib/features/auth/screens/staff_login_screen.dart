@@ -67,20 +67,16 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
     try {
       final cred = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
-      final token = await cred.user?.getIdTokenResult(true);
-      final claims = token?.claims;
-      final hotelId = (claims?['hotelId'] as String?)?.trim() ?? '';
-      final role = ((claims?['role'] as String?) ?? '').trim().toUpperCase();
-      if (hotelId.isEmpty || !_allowedStaffRoles.contains(role)) {
+      final user = cred.user;
+      if (user == null) {
+        throw StateError('Signed-in user record is missing.');
+      }
+      final profile = await resolveStaffProfile(user);
+      if (profile.hotelId.isEmpty || !_allowedStaffRoles.contains(profile.role)) {
         await FirebaseAuth.instance.signOut();
         _snack('Account is not provisioned for staff dashboard access.');
         return;
       }
-      final profile = StaffProfile(
-        uid: cred.user?.uid ?? '',
-        hotelId: hotelId,
-        role: role,
-      );
       ref.read(staffProfileProvider.notifier).state = profile;
       await syncStaffAccessProfile(profile, email: email);
       await markStaffOnline(profile, name: email);

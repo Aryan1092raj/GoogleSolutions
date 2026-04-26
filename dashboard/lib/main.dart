@@ -11,11 +11,14 @@ import 'firebase_options.dart';
 import 'package:go_router/go_router.dart';
 import 'core/dashboard_theme.dart';
 import 'features/auth/screens/staff_login_screen.dart';
+import 'features/auth/providers/dashboard_session_gate.dart';
 import 'features/auth/widgets/dashboard_auth_bootstrap.dart';
 import 'features/command/screens/command_center_screen.dart';
 import 'features/command/screens/incident_detail_screen.dart';
 import 'features/command/screens/incident_history_screen.dart';
+import 'features/command/screens/live_map_screen.dart';
 import 'features/command/screens/qr_generator_screen.dart';
+import 'features/command/screens/video_monitor_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,20 +70,37 @@ class DashboardRouterRefresh extends ChangeNotifier {
 final _dashboardRouterRefresh =
     DashboardRouterRefresh(FirebaseAuth.instance.authStateChanges());
 
-final dashboardRouter = GoRouter(
-  initialLocation:
-      FirebaseAuth.instance.currentUser == null ? '/login' : '/dashboard',
-  refreshListenable: _dashboardRouterRefresh,
-  redirect: (_, state) {
-    final loggedIn = FirebaseAuth.instance.currentUser != null;
-    final onLogin = state.matchedLocation == '/login';
+bool _isProtectedDashboardRoute(String location) {
+  return location == '/dashboard' ||
+      location == '/dashboard/map' ||
+      location == '/dashboard/video' ||
+      location == '/incident-history' ||
+      location == '/qr-generator' ||
+      location.startsWith('/incident/');
+}
 
-    if (!loggedIn && !onLogin) {
-      return '/login';
+final dashboardRouter = GoRouter(
+  initialLocation: '/login',
+  refreshListenable:
+      Listenable.merge([_dashboardRouterRefresh, dashboardSessionGate]),
+  redirect: (_, state) {
+    final session = dashboardSessionGate.value;
+    final onLogin = state.matchedLocation == '/login';
+    final protected = _isProtectedDashboardRoute(state.matchedLocation);
+
+    if (!session.canAccessDashboard) {
+      if (protected) {
+        return '/login';
+      }
+      return null;
     }
 
-    if (loggedIn && onLogin) {
+    if (session.canAccessDashboard && onLogin) {
       return '/dashboard';
+    }
+
+    if (!session.canAccessDashboard && !onLogin) {
+      return '/login';
     }
 
     return null;
@@ -88,9 +108,9 @@ final dashboardRouter = GoRouter(
   routes: [
     GoRoute(
       path: '/',
-      redirect: (_, __) => FirebaseAuth.instance.currentUser == null
-          ? '/login'
-          : '/dashboard',
+      redirect: (_, __) => dashboardSessionGate.value.canAccessDashboard
+          ? '/dashboard'
+          : '/login',
     ),
     GoRoute(
       path: '/login',
@@ -99,6 +119,14 @@ final dashboardRouter = GoRouter(
     GoRoute(
       path: '/dashboard',
       builder: (_, __) => const CommandCenterScreen(),
+    ),
+    GoRoute(
+      path: '/dashboard/map',
+      builder: (_, __) => const LiveMapScreen(),
+    ),
+    GoRoute(
+      path: '/dashboard/video',
+      builder: (_, __) => const VideoMonitorScreen(),
     ),
     GoRoute(
       path: '/incident/:id',

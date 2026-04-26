@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../providers/sos_provider.dart';
+
 const _surface = Color(0xFF121215);
 const _surfaceHigh = Color(0xFF18181B);
 const _outlineVariant = Color(0xFF27272A);
@@ -17,6 +19,7 @@ class SOSGuidePanel extends StatelessWidget {
     required this.aiMessage,
     required this.helpOnWay,
     this.etaMinutes,
+    this.recentUpdates = const [],
     this.hotelId,
     this.roomNumber,
   });
@@ -25,6 +28,7 @@ class SOSGuidePanel extends StatelessWidget {
   final String aiMessage;
   final bool helpOnWay;
   final int? etaMinutes;
+  final List<GuestIncidentUpdate> recentUpdates;
   final String? hotelId;
   final String? roomNumber;
 
@@ -131,12 +135,70 @@ class SOSGuidePanel extends StatelessWidget {
                                   color: _onSurface,
                                   fontSize: 13,
                                   height: 1.45,
+                ),
+              ),
+            ),
+            if (recentUpdates.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _GuideSection(
+                title: 'Security Updates',
+                child: Column(
+                  children: recentUpdates
+                      .map(
+                        (update) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(top: 3),
+                                child: Icon(
+                                  Icons.notifications_active_outlined,
+                                  color: _primary,
+                                  size: 16,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      update.title,
+                                      style: const TextStyle(
+                                        color: _onSurface,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    if (update.detail.trim().isNotEmpty)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          update.detail,
+                                          style: const TextStyle(
+                                            color: _onSurfaceMuted,
+                                            fontSize: 12,
+                                            height: 1.45,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
                     )
                     .toList(),
               ),

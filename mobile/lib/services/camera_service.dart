@@ -119,11 +119,8 @@ class CameraService {
   final AudioChunkSource _audioSource;
   final CapturePermissionGate _permissionGate;
 
-  String? _latestFrameBase64;
   bool _streaming = false;
   bool _audioStreaming = false;
-  bool _imageStreamStarted = false;
-  int _lastStreamFrameAtMs = 0;
 
   Future<void> initialize() async {
     if (_controller != null && _controller!.value.isInitialized) {
@@ -173,38 +170,9 @@ class CameraService {
       return;
     }
     _streaming = true;
-    _latestFrameBase64 = null;
-    _lastStreamFrameAtMs = 0;
+    // Still JPEG capture is slower than image streaming, but it keeps relay
+    // frames displayable across devices and camera plugin format quirks.
     unawaited(_ensureAudioStarted());
-
-    _imageStreamStarted = false;
-    if (kIsWeb) {
-      return;
-    }
-
-    if (!_supportsDisplayableImageStreaming) {
-      return;
-    }
-
-    try {
-      await _controller!.startImageStream((CameraImage image) {
-        final now = DateTime.now().millisecondsSinceEpoch;
-        if (now - _lastStreamFrameAtMs < AppConstants.mediaChunkIntervalMs) {
-          return;
-        }
-
-        final encoded = encodeDisplayableStreamFrame(image);
-        if (encoded == null || encoded.isEmpty) {
-          return;
-        }
-
-        _lastStreamFrameAtMs = now;
-        _latestFrameBase64 = encoded;
-      });
-      _imageStreamStarted = true;
-    } on CameraException {
-      _imageStreamStarted = false;
-    }
   }
 
   Future<void> stopCapture() async {
@@ -213,25 +181,12 @@ class CameraService {
       return;
     }
     _streaming = false;
-    _latestFrameBase64 = null;
-    _lastStreamFrameAtMs = 0;
-
-    if (_imageStreamStarted) {
-      try {
-        await _controller!.stopImageStream();
-      } catch (_) {}
-    }
-    _imageStreamStarted = false;
     await _stopAudio();
   }
 
   Future<String> captureFrame() async {
     if (_controller == null || !_controller!.value.isInitialized) {
       await initialize();
-    }
-
-    if (_imageStreamStarted) {
-      return _latestFrameBase64 ?? '';
     }
 
     final file = await _controller!.takePicture();
@@ -343,9 +298,5 @@ class CameraService {
       default:
         return ImageFormatGroup.yuv420;
     }
-  }
-
-  bool get _supportsDisplayableImageStreaming {
-    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   }
 }
