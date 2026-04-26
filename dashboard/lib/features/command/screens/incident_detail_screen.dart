@@ -168,7 +168,7 @@ class _TopBar extends StatelessWidget {
             ),
             child: Text(
               incidentId,
-              style: GoogleFonts.robotoMono(
+              style: dashboardMonoTextStyle(
                 color: kDashTextSub,
                 fontSize: 11,
               ),
@@ -703,7 +703,7 @@ class _LocationCard extends StatelessWidget {
               if (detail.lat != null && detail.lng != null)
                 Text(
                   '${detail.lat!.toStringAsFixed(5)}, ${detail.lng!.toStringAsFixed(5)}',
-                  style: GoogleFonts.robotoMono(
+                  style: dashboardMonoTextStyle(
                     color: kDashTextSub,
                     fontSize: 10,
                   ),
@@ -1002,7 +1002,7 @@ class _ResolvedInfoCard extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             detail.incidentId,
-            style: GoogleFonts.robotoMono(
+            style: dashboardMonoTextStyle(
               color: kDashAccent,
               fontSize: 18,
               fontWeight: FontWeight.w700,

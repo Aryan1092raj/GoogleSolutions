@@ -5,10 +5,25 @@ import 'dart:convert';
 import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/dashboard_theme.dart';
 import '../providers/incident_provider.dart';
+
+const _qrRoomTypes = [
+  'Standard Room',
+  'Deluxe Room',
+  'Suite',
+  'Conference Room',
+  'Pool Area',
+  'Other',
+];
+
+const _qrLanguages = [
+  {'code': 'en', 'label': 'English'},
+  {'code': 'hi', 'label': 'Hindi'},
+];
 
 class QrGeneratorScreen extends ConsumerStatefulWidget {
   const QrGeneratorScreen({super.key});
@@ -21,6 +36,8 @@ class _QrGeneratorScreenState extends ConsumerState<QrGeneratorScreen> {
   final _floorCtrl = TextEditingController();
   final _wingCtrl = TextEditingController();
   final _roomsCtrl = TextEditingController();
+  String _roomType = _qrRoomTypes.first;
+  String _language = 'en';
   List<Map<String, dynamic>> _qrCodes = [];
 
   @override
@@ -74,6 +91,8 @@ class _QrGeneratorScreenState extends ConsumerState<QrGeneratorScreen> {
         'roomNumber': room,
         'floor': floor,
         'wing': wing,
+        'roomType': _roomType,
+        'language': _language,
       };
       codes.add({
         'roomNumber': room,
@@ -135,7 +154,7 @@ class _QrGeneratorScreenState extends ConsumerState<QrGeneratorScreen> {
                     ? 'UNASSIGNED'
                     : profile.hotelId.toUpperCase(),
                 role: profile.role.isEmpty ? 'STAFF' : profile.role,
-                onBack: () => Navigator.of(context).pop(),
+                onBack: () => context.go('/dashboard'),
               ),
               Expanded(
                 child: SingleChildScrollView(
@@ -186,6 +205,52 @@ class _QrGeneratorScreenState extends ConsumerState<QrGeneratorScreen> {
                               controller: _roomsCtrl,
                               label: 'Room Numbers (comma-separated)',
                               hint: 'e.g., 101, 102, 103, 104',
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _ChoiceField<String>(
+                                    label: 'Default Room Type',
+                                    value: _roomType,
+                                    items: _qrRoomTypes
+                                        .map(
+                                          (roomType) => DropdownMenuItem(
+                                            value: roomType,
+                                            child: Text(roomType),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (value) {
+                                      if (value == null) {
+                                        return;
+                                      }
+                                      setState(() => _roomType = value);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _ChoiceField<String>(
+                                    label: 'Default Language',
+                                    value: _language,
+                                    items: _qrLanguages
+                                        .map(
+                                          (language) => DropdownMenuItem(
+                                            value: language['code']!,
+                                            child: Text(language['label']!),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (value) {
+                                      if (value == null) {
+                                        return;
+                                      }
+                                      setState(() => _language = value);
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 20),
                             Row(
@@ -469,8 +534,79 @@ class _QrCard extends StatelessWidget {
               fontSize: 10,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            '${qrData['roomType']} · ${qrData['language'].toString().toUpperCase()}',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: kDashTextMut,
+              fontSize: 10,
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ChoiceField<T> extends StatelessWidget {
+  final String label;
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  const _ChoiceField({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            color: kDashText,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<T>(
+          initialValue: value,
+          dropdownColor: kDashSurface2,
+          style: GoogleFonts.inter(
+            color: kDashText,
+            fontSize: 14,
+          ),
+          items: items,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0x0AFFFFFF),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kDashBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kDashBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kDashAccent),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

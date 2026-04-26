@@ -75,6 +75,10 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
                       ? data['floor']
                       : int.tryParse(data['floor'].toString()) ?? 0,
                   'wing': data['wing'].toString(),
+                  if (data['roomType'] != null)
+                    'roomType': data['roomType'].toString(),
+                  if (data['language'] != null)
+                    'language': data['language'].toString(),
                 };
 
                 // Call callback and pop

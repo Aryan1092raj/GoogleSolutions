@@ -308,3 +308,6 @@ Thumbs.db
 .codex
 progress.txt
 deployment.txt
+sentry/
+.vscode
+caveman/

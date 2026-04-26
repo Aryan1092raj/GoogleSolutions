@@ -454,7 +454,7 @@ class _IncidentCardTile extends StatelessWidget {
                           child: Text(
                             card.incidentId,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.robotoMono(
+                            style: dashboardMonoTextStyle(
                               color: kDashTextMut,
                               fontSize: 11,
                               fontWeight: FontWeight.w500,

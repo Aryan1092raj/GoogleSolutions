@@ -820,7 +820,7 @@ class _HistoryRow extends StatelessWidget {
               flex: 140,
               child: Text(
                 record.incidentId,
-                style: GoogleFonts.robotoMono(
+                style: dashboardMonoTextStyle(
                   color: kDashAccent,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

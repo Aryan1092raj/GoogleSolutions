@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -205,15 +206,44 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          SizedBox(
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                context.go('/login');
+              }
+            },
+            icon: const Icon(
+              Icons.logout,
+              size: 18,
+              color: kDashTextMut,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
             width: 280,
-            child: TextField(
-              readOnly: true,
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: subtitle,
-                prefixIcon: const Icon(Icons.search, size: 16),
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: kDashBg,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: kDashBorder),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search, size: 16, color: kDashTextMut),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    subtitle,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: kDashTextDim,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

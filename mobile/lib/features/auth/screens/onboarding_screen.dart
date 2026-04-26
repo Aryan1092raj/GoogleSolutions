@@ -116,6 +116,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               _roomCtrl.text = data['roomNumber'] as String;
               _floor = data['floor'] as int;
               _wing = data['wing'] as String;
+              if (data['roomType'] is String &&
+                  _kRoomTypes.contains(data['roomType'])) {
+                _roomType = data['roomType'] as String;
+              }
+              if (data['language'] is String &&
+                  ['en', 'hi'].contains(data['language'])) {
+                _selectedLang = data['language'] as String;
+              }
             });
           },
         ),

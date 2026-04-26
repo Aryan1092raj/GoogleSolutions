@@ -220,3 +220,18 @@ ThemeData buildDashboardTheme() {
     ),
   );
 }
+
+TextStyle dashboardMonoTextStyle({
+  Color color = kDashTextSub,
+  double fontSize = 12,
+  FontWeight fontWeight = FontWeight.w500,
+  double? height,
+}) {
+  return TextStyle(
+    color: color,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    height: height,
+    fontFamily: 'monospace',
+  );
+}
