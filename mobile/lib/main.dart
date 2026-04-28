@@ -37,9 +37,17 @@ Future<void> _activateFirebaseAppCheck() async {
       return;
     }
 
+    // firebase_app_check 0.3.x: playIntegrityWithDeviceCheckFallback is not
+    // available. Use playIntegrity for release builds — if the token fails
+    // (e.g. App Distribution without Play Store listing), the error is caught
+    // below and the app continues. The backend runs in monitoring mode so SOS
+    // is never blocked by a missing token.
     await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.debug,
-      appleProvider: AppleProvider.debug,
+      androidProvider:
+          kReleaseMode ? AndroidProvider.playIntegrity : AndroidProvider.debug,
+      appleProvider: kReleaseMode
+          ? AppleProvider.appAttest
+          : AppleProvider.debug,
     );
   } catch (error, stackTrace) {
     debugPrint('Firebase App Check activation failed: $error');

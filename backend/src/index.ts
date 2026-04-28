@@ -52,20 +52,41 @@ app.use(async function (req, res, next) {
 app.use('/health', healthRouter); 
 app.use('/api/auth', authRouter);
 
-// App Check verification for incident creation (blocks fake SOS)
+// App Check verification for incident creation.
+// APP_CHECK_ENFORCE=true (default): hard-reject invalid/missing tokens.
+// APP_CHECK_ENFORCE=false: monitoring-only mode — log warning, allow through.
+// Use monitoring mode for Firebase App Distribution builds (no Play Store).
+const appCheckEnforce = (process.env.APP_CHECK_ENFORCE ?? 'true').trim().toLowerCase() !== 'false';
+
 app.use('/api/incidents', async function (req, res, next) {
   if (req.method !== 'POST') { next(); return; }
   const appCheckToken = req.headers['x-firebase-appcheck'];
-  if (!appCheckToken || typeof appCheckToken !== 'string') {
-    res.status(401).json({ error: 'App Check token missing' });
+
+  // No token at all — always reject in enforce mode, warn in monitoring mode
+  if (!appCheckToken || typeof appCheckToken !== 'string' || appCheckToken.trim() === '') {
+    if (appCheckEnforce) {
+      res.status(401).json({ error: 'App Check token missing' });
+      return;
+    }
+    logger.warn('App Check token missing — monitoring mode, allowing through', {
+      path: req.path,
+      method: req.method,
+    });
+    next();
     return;
   }
+
   try {
-    await getFirebaseApp().appCheck().verifyToken(appCheckToken);
+    await getFirebaseApp().appCheck().verifyToken(appCheckToken.trim());
     next();
   } catch (error) {
-    logger.warn('App Check verification failed', { error });
-    res.status(401).json({ error: 'App Check verification failed' });
+    if (appCheckEnforce) {
+      logger.warn('App Check verification failed — enforce mode, blocking', { error });
+      res.status(401).json({ error: 'App Check verification failed' });
+      return;
+    }
+    logger.warn('App Check verification failed — monitoring mode, allowing through', { error });
+    next();
   }
 });
 app.use('/api/incidents', incidentRouter);

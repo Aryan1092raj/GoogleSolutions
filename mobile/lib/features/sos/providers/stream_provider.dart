@@ -87,8 +87,10 @@ class StreamNotifier extends StateNotifier<StreamState> {
 }
 
 final streamProvider =
-    StateNotifierProvider.autoDispose<StreamNotifier, StreamState>((ref) {
+    StateNotifierProvider<StreamNotifier, StreamState>((ref) {
   final camera = ref.read(cameraServiceProvider);
   final ws = ref.read(webSocketServiceProvider);
-  return StreamNotifier(camera, ws);
+  final notifier = StreamNotifier(camera, ws);
+  ref.onDispose(notifier.stopStreaming);
+  return notifier;
 });

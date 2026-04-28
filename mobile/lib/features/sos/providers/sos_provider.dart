@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io' show SocketException;
 
 import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+    show kIsWeb, defaultTargetPlatform, TargetPlatform, debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -196,10 +196,7 @@ class SOSNotifier extends StateNotifier<SOSState> {
     double? lng,
     GuestProfile profile,
   ) async {
-    String appCheckToken = '';
-    try {
-      appCheckToken = await FirebaseAppCheck.instance.getToken() ?? '';
-    } catch (_) {}
+    final appCheckToken = await _requireAppCheckToken();
 
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/api/incidents');
     final resp = await http.post(
@@ -258,6 +255,35 @@ class SOSNotifier extends StateNotifier<SOSState> {
     _attachIncidentSync(incidentId);
     if (!mounted) return;
     state = state.copyWith(status: SOSStatus.active, incidentId: incidentId);
+  }
+
+  Future<String> _requireAppCheckToken() async {
+    // Try up to 3 times with increasing delays so Play Integrity / DeviceCheck
+    // has enough time to warm up on first launch.
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final token = await FirebaseAppCheck.instance.getToken(attempt > 0);
+        if (token != null && token.trim().isNotEmpty) {
+          return token.trim();
+        }
+      } catch (e) {
+        debugPrint('App Check getToken attempt $attempt failed: $e');
+      }
+
+      if (attempt < 2) {
+        await Future<void>.delayed(Duration(milliseconds: 800 * (attempt + 1)));
+      }
+    }
+
+    // App Check unavailable (App Distribution without Play Store).
+    // Return empty string — backend is in monitoring mode and will allow through.
+    // The failure is logged in Firebase App Check console for visibility.
+    debugPrint(
+      'App Check token unavailable after 3 attempts. '
+      'Proceeding without token (backend in monitoring mode). '
+      'To fix permanently, publish to Google Play Store.',
+    );
+    return '';
   }
 
   /// Handle network failure by queuing the SOS payload and starting retry listener.
