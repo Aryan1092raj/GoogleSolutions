@@ -51,7 +51,6 @@ app.use(async function (req, res, next) {
  
 app.use('/health', healthRouter); 
 app.use('/api/auth', authRouter);
-app.use('/api/incidents', incidentRouter);
 
 // App Check verification for incident creation (blocks fake SOS)
 app.use('/api/incidents', async function (req, res, next) {
@@ -69,6 +68,7 @@ app.use('/api/incidents', async function (req, res, next) {
     res.status(401).json({ error: 'App Check verification failed' });
   }
 });
+app.use('/api/incidents', incidentRouter);
  
 const server = http.createServer(app); 
 createWsServer(server); 

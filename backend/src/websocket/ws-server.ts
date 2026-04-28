@@ -1,27 +1,17 @@
 import { WebSocketServer } from 'ws'; 
-import jwt from 'jsonwebtoken'; 
-import { generateKeyPairSync } from 'crypto'; 
 import { URL } from 'url'; 
 import { logger } from '../utils/logger'; 
 import { handleSosMessage } from './sos-handler'; 
 import { registerGuestSender } from './gemini-bridge'; 
 import { getFirebaseApp } from '../config/firebase-admin'; 
+import * as firebaseService from '../services/firebase.service';
  
-const keyPair = generateKeyPairSync('rsa', { modulusLength: 2048 }); 
 const wsSessions = new Map(); 
 const dashboardSessions = new Map(); 
 let wsServerInstance = null; 
 let dashboardWsServer = null; 
  
 const heartbeatIntervalMs = Number(process.env.WS_HEARTBEAT_INTERVAL_MS ? process.env.WS_HEARTBEAT_INTERVAL_MS : '30000'); 
- 
-export function issueWsToken(claims) { 
-  return jwt.sign(claims, keyPair.privateKey, { algorithm: 'RS256', expiresIn: '5m' }); 
-} 
- 
-export function verifyWsToken(token) { 
-  return jwt.verify(token, keyPair.publicKey, { algorithms: ['RS256'] }); 
-} 
  
 export function sendToGuest(incidentId, message) { 
   const ws = wsSessions.get(incidentId); 
@@ -125,59 +115,77 @@ export function createWsServer(httpServer) {
 
 function _handleGuestUpgrade(wss, request, socket, head) {
   const url = new URL(request.url, 'http://' + request.headers.host);
-  const token = url.searchParams.get('token'); 
-  const incidentId = url.searchParams.get('incidentId'); 
-  if (!token || !incidentId) { 
-    socket.destroy(); 
-    return; 
-  } 
-  
-  let claims = null; 
-  try { 
-    claims = verifyWsToken(token); 
-  } catch (error) { 
-    socket.destroy(); 
-    return; 
-  } 
-  
-  if (!claims || claims.incidentId !== incidentId) { 
-    socket.destroy(); 
-    return; 
-  } 
-  
-  wss.handleUpgrade(request, socket, head, function (ws) { 
-    (ws as any).incidentId = incidentId; 
-    (ws as any).isAlive = true; 
-    wsSessions.set(incidentId, ws); 
-    wss.emit('connection', ws, request); 
-  }); 
+  const token = url.searchParams.get('token');
+  const incidentId = url.searchParams.get('incidentId');
+  if (!token || !incidentId) {
+    socket.write('HTTP/1.1 400 Bad Request\r\n\r\nMissing token or incidentId');
+    socket.destroy();
+    return;
+  }
+
+  getFirebaseApp().auth().verifyIdToken(token).then(async (claims) => {
+    const incident = await firebaseService.getIncidentById(incidentId);
+    if (!incident) {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\nIncident not found');
+      socket.destroy();
+      return;
+    }
+
+    const guestId = typeof claims.uid === 'string' ? claims.uid : '';
+    const hotelId = typeof claims.hotelId === 'string' ? claims.hotelId : '';
+    if (guestId !== incident.guestId || (hotelId && hotelId !== incident.hotelId)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\nGuest token does not match incident');
+      socket.destroy();
+      return;
+    }
+
+    wss.handleUpgrade(request, socket, head, function (ws) {
+      (ws as any).incidentId = incidentId;
+      (ws as any).guestId = guestId;
+      (ws as any).isAlive = true;
+      wsSessions.set(incidentId, ws);
+      wss.emit('connection', ws, request);
+    });
+  }).catch((error) => {
+    logger.warn('guest ws auth failed', {
+      incidentId,
+      error: error?.message,
+    });
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\nInvalid Firebase token');
+    socket.destroy();
+  });
 }
 
 function _handleDashboardUpgrade(wss, request, socket, head) {
   const url = new URL(request.url, 'http://' + request.headers.host);
-  const token = url.searchParams.get('token'); 
-  const incidentId = url.searchParams.get('incidentId'); 
-  if (!token || !incidentId) { 
-    socket.destroy(); 
-    return; 
-  } 
-  
-  getFirebaseApp().auth().verifyIdToken(token).then((claims) => { 
-    wss.handleUpgrade(request, socket, head, function (ws) { 
-      (ws as any).incidentId = incidentId; 
-      (ws as any).staffId = claims.uid; 
-      
-      if (!dashboardSessions.has(incidentId)) { 
-        dashboardSessions.set(incidentId, new Set()); 
-      } 
-      dashboardSessions.get(incidentId)!.add(ws); 
-      
-      wss.emit('connection', ws, request); 
-    }); 
-  }).catch((error) => { 
-    logger.warn('dashboard ws auth failed', { error: error?.message });
-    socket.destroy(); 
-  }); 
+  const token = url.searchParams.get('token');
+  const incidentId = url.searchParams.get('incidentId');
+  if (!token || !incidentId) {
+    socket.write('HTTP/1.1 400 Bad Request\r\n\r\nMissing token or incidentId');
+    socket.destroy();
+    return;
+  }
+
+  getFirebaseApp().auth().verifyIdToken(token).then((claims) => {
+    wss.handleUpgrade(request, socket, head, function (ws) {
+      (ws as any).incidentId = incidentId;
+      (ws as any).staffId = claims.uid;
+
+      if (!dashboardSessions.has(incidentId)) {
+        dashboardSessions.set(incidentId, new Set());
+      }
+      dashboardSessions.get(incidentId)!.add(ws);
+
+      wss.emit('connection', ws, request);
+    });
+  }).catch((error) => {
+    logger.warn('dashboard ws auth failed', {
+      incidentId,
+      error: error?.message,
+    });
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\nInvalid Firebase token');
+    socket.destroy();
+  });
 }
  
 export function getWsServer() { 

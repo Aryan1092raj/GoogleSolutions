@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme.dart';
 import '../providers/sos_provider.dart';
 
-const _surface = Color(0xFF121215);
-const _surfaceHigh = Color(0xFF18181B);
-const _outlineVariant = Color(0xFF27272A);
-const _primary = Color(0xFFA78BFA);
-const _onSurface = Color(0xFFFAFAFA);
-const _onSurfaceMuted = Color(0xFFA1A1AA);
-const _critical = Color(0xFFEF4444);
-const _warning = Color(0xFFF97316);
-const _ok = Color(0xFF34D399);
+const _guideBorder = Color(0x1FFFFFFF);
+const _critical = kPrimary;
+const _warning = Color(0xFFF59E0B);
+const _ok = kSecondary;
 
 class SOSGuidePanel extends StatelessWidget {
   const SOSGuidePanel({
@@ -35,84 +31,48 @@ class SOSGuidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalizedSeverity = severity.toUpperCase();
-    final steps = _stepsFor(normalizedSeverity);
-    final summary = _statusSummary();
 
     return Container(
       decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _outlineVariant),
+        color: kSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _guideBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: _surfaceHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.menu_book, color: _primary, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'LIVE SAFETY GUIDE',
-                    style: TextStyle(
-                      color: _onSurface,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                ),
-              ],
+            _GuideHeader(
+              hotelId: hotelId,
+              roomNumber: roomNumber,
             ),
-            if ((hotelId?.isNotEmpty ?? false) || (roomNumber?.isNotEmpty ?? false))
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  [
-                    if (hotelId?.isNotEmpty ?? false) hotelId,
-                    if (roomNumber?.isNotEmpty ?? false) 'Room $roomNumber',
-                  ].join(' • '),
-                  style: const TextStyle(
-                    color: _onSurfaceMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             _StatusCard(
               severity: normalizedSeverity,
-              summary: summary,
+              summary: _statusSummary(),
               etaMinutes: etaMinutes,
             ),
             const SizedBox(height: 14),
-            if (aiMessage.trim().isNotEmpty)
+            if (aiMessage.trim().isNotEmpty) ...[
               _GuideSection(
                 title: 'Assistant Update',
                 child: Text(
                   aiMessage,
                   style: const TextStyle(
-                    color: _onSurface,
+                    color: kTextPrimary,
                     fontSize: 14,
-                    height: 1.45,
                     fontWeight: FontWeight.w600,
+                    height: 1.45,
                   ),
                 ),
               ),
-            if (aiMessage.trim().isNotEmpty) const SizedBox(height: 14),
+              const SizedBox(height: 14),
+            ],
             _GuideSection(
               title: 'What To Do Now',
               child: Column(
-                children: steps
+                children: _stepsFor(normalizedSeverity)
                     .map(
                       (step) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -132,10 +92,17 @@ class SOSGuidePanel extends StatelessWidget {
                               child: Text(
                                 step,
                                 style: const TextStyle(
-                                  color: _onSurface,
+                                  color: kTextPrimary,
                                   fontSize: 13,
                                   height: 1.45,
-                ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ),
             if (recentUpdates.isNotEmpty) ...[
@@ -154,32 +121,30 @@ class SOSGuidePanel extends StatelessWidget {
                                 padding: EdgeInsets.only(top: 3),
                                 child: Icon(
                                   Icons.notifications_active_outlined,
-                                  color: _primary,
+                                  color: kBrandBlue,
                                   size: 16,
                                 ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       update.title,
                                       style: const TextStyle(
-                                        color: _onSurface,
+                                        color: kTextPrimary,
                                         fontSize: 13,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                     if (update.detail.trim().isNotEmpty)
                                       Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 4),
+                                        padding: const EdgeInsets.only(top: 4),
                                         child: Text(
                                           update.detail,
                                           style: const TextStyle(
-                                            color: _onSurfaceMuted,
+                                            color: kTextMuted,
                                             fontSize: 12,
                                             height: 1.45,
                                           ),
@@ -199,13 +164,6 @@ class SOSGuidePanel extends StatelessWidget {
           ],
         ),
       ),
-                    )
-                    .toList(),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -220,8 +178,8 @@ class SOSGuidePanel extends StatelessWidget {
     return 'Dispatch is still being coordinated. Keep this session open.';
   }
 
-  List<String> _stepsFor(String severity) {
-    switch (severity) {
+  List<String> _stepsFor(String currentSeverity) {
+    switch (currentSeverity) {
       case 'CRITICAL':
         return const [
           'Remain hidden, keep your phone on silent, and avoid drawing attention.',
@@ -244,8 +202,74 @@ class SOSGuidePanel extends StatelessWidget {
   }
 }
 
+class _GuideHeader extends StatelessWidget {
+  const _GuideHeader({
+    required this.hotelId,
+    required this.roomNumber,
+  });
+
+  final String? hotelId;
+  final String? roomNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: kPanel,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _guideBorder),
+              ),
+              child: const Icon(
+                Icons.menu_book_outlined,
+                color: kBrandBlue,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'LIVE SAFETY GUIDE',
+                style: TextStyle(
+                  color: kTextPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if ((hotelId?.isNotEmpty ?? false) || (roomNumber?.isNotEmpty ?? false))
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              [
+                if (hotelId?.isNotEmpty ?? false) hotelId,
+                if (roomNumber?.isNotEmpty ?? false) 'Room $roomNumber',
+              ].join(' • '),
+              style: const TextStyle(
+                color: kTextMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _GuideSection extends StatelessWidget {
-  const _GuideSection({required this.title, required this.child});
+  const _GuideSection({
+    required this.title,
+    required this.child,
+  });
 
   final String title;
   final Widget child;
@@ -256,9 +280,9 @@ class _GuideSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _surfaceHigh,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _outlineVariant),
+        color: kSurfaceHigh,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _guideBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,10 +290,10 @@ class _GuideSection extends StatelessWidget {
           Text(
             title.toUpperCase(),
             style: const TextStyle(
-              color: _primary,
+              color: kBrandBlue,
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
+              letterSpacing: 0.9,
             ),
           ),
           const SizedBox(height: 10),
@@ -296,7 +320,7 @@ class _StatusCard extends StatelessWidget {
     final severityColor = switch (severity) {
       'CRITICAL' => _critical,
       'HIGH' => _warning,
-      _ => _primary,
+      _ => kBrandBlue,
     };
 
     return Container(
@@ -304,7 +328,7 @@ class _StatusCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: severityColor.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: severityColor.withValues(alpha: 0.28)),
       ),
       child: Column(
@@ -322,10 +346,10 @@ class _StatusCard extends StatelessWidget {
           Text(
             summary,
             style: const TextStyle(
-              color: _onSurface,
+              color: kTextPrimary,
               fontSize: 13,
-              height: 1.4,
               fontWeight: FontWeight.w600,
+              height: 1.4,
             ),
           ),
           if (etaMinutes != null && etaMinutes! > 0)
@@ -334,7 +358,7 @@ class _StatusCard extends StatelessWidget {
               child: Text(
                 'Estimated arrival: $etaMinutes min',
                 style: const TextStyle(
-                  color: _onSurfaceMuted,
+                  color: kTextMuted,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),

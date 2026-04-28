@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import * as firebaseService from '../services/firebase.service';
-import { issueWsToken } from '../websocket/ws-server';
 import { sendToGuest } from '../websocket/ws-server';
 import { cancelEscalationTimer } from '../services/escalation.service';
  
@@ -52,11 +51,12 @@ incidentRouter.post('/', async function (req, res) {
     return; 
   } 
  
-  const wsToken = issueWsToken({ 
-    incidentId: body.incidentId, 
-    guestId: body.guestId, 
-    hotelId: body.hotelId, 
-  }); 
+  const authHeader = typeof req.headers.authorization === 'string'
+    ? req.headers.authorization
+    : '';
+  const wsToken = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : '';
  
   res.status(201).json({ 
     incidentId: body.incidentId, 

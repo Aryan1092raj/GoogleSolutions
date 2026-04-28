@@ -1,8 +1,23 @@
 import 'dart:async'; 
 import 'dart:convert'; 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:web_socket_channel/web_socket_channel.dart'; 
 import '../core/constants.dart'; 
  
+Future<String?> resolveWebSocketReconnectToken(
+  Future<String?> Function() refreshIdToken,
+  String? fallbackToken,
+) async {
+  try {
+    final refreshedToken = await refreshIdToken();
+    if (refreshedToken != null && refreshedToken.isNotEmpty) {
+      return refreshedToken;
+    }
+  } catch (_) {}
+
+  return fallbackToken;
+}
+
 class SOSInitPayload { 
   final Map<String, dynamic> data; 
   SOSInitPayload(this.data); 
@@ -131,13 +146,24 @@ class WebSocketService {
   } 
  
   Future<void> reconnect() async { 
-    if (_wsToken == null) { 
-      return; 
-    } 
     if (_incidentId == null) { 
       return; 
-    } 
-    await connect(_wsToken as String, _incidentId as String); 
+    }
+
+    String? nextToken = _wsToken;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      nextToken = await resolveWebSocketReconnectToken(
+        () => user.getIdToken(true),
+        _wsToken,
+      );
+    }
+
+    if (nextToken == null || nextToken.isEmpty) {
+      return;
+    }
+
+    await connect(nextToken, _incidentId as String); 
   } 
 
   Future<void> disconnect() async {

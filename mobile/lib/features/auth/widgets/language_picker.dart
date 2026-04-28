@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme.dart';
 
 /// Supported guest languages (ISO 639-1 code → display name).
 const _kLanguages = {
@@ -29,16 +30,52 @@ class LanguagePicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       initialValue: _kLanguages.containsKey(value) ? value : 'en',
+      dropdownColor: kPanel,
+      iconEnabledColor: kTextMuted,
+      style: const TextStyle(
+        color: kTextPrimary,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
       decoration: InputDecoration(
         labelText: 'Language',
         prefixIcon: const Icon(Icons.language),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: kPanel,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(
+            color: Color(0x1FFFFFFF),
+            width: 1,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(
+            color: kBrandBlue,
+            width: 1.5,
+          ),
+        ),
       ),
       items: _kLanguages.entries
           .map(
             (e) => DropdownMenuItem<String>(
               value: e.key,
-              child: Text('${e.key.toUpperCase()}  ${e.value}'),
+              child: Text(
+                '${e.key.toUpperCase()}  ${e.value}',
+                style: const TextStyle(
+                  color: kTextPrimary,
+                  fontSize: 14,
+                ),
+              ),
             ),
           )
           .toList(),

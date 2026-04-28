@@ -13,6 +13,7 @@ void main() {
             incidentId: 'incident-42',
             initialPanel: SOSActivePanel.guide,
             autoStartStreaming: false,
+            autoObserveIncident: false,
           ),
         ),
       ),

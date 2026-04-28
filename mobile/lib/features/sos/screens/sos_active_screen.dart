@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme.dart';
 import '../../../core/severity_colors.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/sos_active_panel.dart';
@@ -13,17 +14,17 @@ import '../widgets/incident_chat_panel.dart';
 import '../widgets/sos_guide_panel.dart';
 import '../widgets/sos_overview_panel.dart';
 
-const _bg = Color(0xFF09090B);
-const _surface = Color(0xFF121215);
-const _surfaceHigh = Color(0xFF18181B);
-const _surfaceHighest = Color(0xFF1E1E22);
-const _outlineVariant = Color(0xFF27272A);
-const _primary = Color(0xFFA78BFA);
-const _primaryContainer = Color(0xFF7C3AED);
-const _onSurface = Color(0xFFFAFAFA);
-const _onSurfaceMuted = Color(0xFFA1A1AA);
-const _tertiary = Color(0xFF34D399);
-const _error = Color(0xFFEF4444);
+const _bg = kBackground;
+const _surface = kSurface;
+const _surfaceHigh = kSurfaceHigh;
+const _surfaceHighest = kSurfaceActive;
+const _outlineVariant = Color(0x1FFFFFFF);
+const _primary = kBrandBlue;
+const _primaryContainer = Color(0xFF2563EB);
+const _onSurface = kTextPrimary;
+const _onSurfaceMuted = kTextMuted;
+const _tertiary = kSecondary;
+const _error = kPrimary;
 
 class _CameraPreviewLayer extends ConsumerWidget {
   const _CameraPreviewLayer();
@@ -61,11 +62,13 @@ class SOSActiveScreen extends ConsumerStatefulWidget {
   final String incidentId;
   final SOSActivePanel initialPanel;
   final bool autoStartStreaming;
+  final bool autoObserveIncident;
   const SOSActiveScreen({
     super.key,
     required this.incidentId,
     this.initialPanel = SOSActivePanel.sos,
     this.autoStartStreaming = true,
+    this.autoObserveIncident = true,
   });
 
   @override
@@ -121,7 +124,9 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
       if (!mounted) {
         return;
       }
-      _sosNotifier.observeIncident(widget.incidentId);
+      if (widget.autoObserveIncident) {
+        _sosNotifier.observeIncident(widget.incidentId);
+      }
       if (_streamStartRequested || !widget.autoStartStreaming) {
         return;
       }
@@ -214,7 +219,7 @@ class _SOSActiveScreenState extends ConsumerState<SOSActiveScreen>
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xFF0C0C0F), _bg],
+                  colors: [Color(0xFF0B0D10), _bg],
                 ),
               ),
             ),

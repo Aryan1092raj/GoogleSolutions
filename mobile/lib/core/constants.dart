@@ -9,10 +9,20 @@ class AppConstants {
     defaultValue: '',
   );
 
-  static const String wsUrl = String.fromEnvironment(
-    'WS_URL',
-    defaultValue: 'ws://localhost:8080/ws',
-  );
+  static String get wsUrl {
+    const configured = String.fromEnvironment('WS_URL', defaultValue: '');
+    if (configured.isNotEmpty) {
+      return configured;
+    }
+
+    final backendUri = Uri.parse(backendBaseUrl);
+    final wsScheme = backendUri.scheme == 'https' ? 'wss' : 'ws';
+    return backendUri.replace(
+      scheme: wsScheme,
+      path: '/ws',
+      queryParameters: null,
+    ).toString();
+  }
 
   static const int videoWidthPx = 640;
   static const int videoHeightPx = 480;

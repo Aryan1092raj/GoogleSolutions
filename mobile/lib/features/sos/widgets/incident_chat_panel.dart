@@ -2,16 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme.dart';
 import '../../auth/providers/auth_provider.dart';
 
-const _surface = Color(0xFF121215);
-const _surfaceHigh = Color(0xFF18181B);
-const _surfaceHighest = Color(0xFF1E1E22);
-const _outlineVariant = Color(0xFF27272A);
-const _primary = Color(0xFFA78BFA);
-const _onSurface = Color(0xFFFAFAFA);
-const _onSurfaceMuted = Color(0xFFA1A1AA);
-const _tertiary = Color(0xFF34D399);
+const _surface = kSurface;
+const _surfaceHigh = kSurfaceHigh;
+const _surfaceHighest = kSurfaceActive;
+const _outlineVariant = Color(0x1FFFFFFF);
+const _primary = kBrandBlue;
+const _onSurface = kTextPrimary;
+const _onSurfaceMuted = kTextMuted;
+const _tertiary = kSecondary;
 
 class IncidentChatPanel extends StatefulWidget {
   final String incidentId;
@@ -97,7 +98,7 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
     return Container(
       decoration: BoxDecoration(
         color: _surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _outlineVariant),
       ),
       child: Column(
@@ -107,7 +108,7 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
             decoration: BoxDecoration(
               color: _surfaceHigh.withValues(alpha: 0.6),
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
+                top: Radius.circular(12),
               ),
               border: Border.all(color: Colors.transparent),
             ),
@@ -198,10 +199,10 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
                                 ? _primary.withValues(alpha: 0.12)
                                 : _surfaceHighest,
                             borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(14),
-                              topRight: const Radius.circular(14),
-                              bottomLeft: Radius.circular(isGuest ? 14 : 4),
-                              bottomRight: Radius.circular(isGuest ? 4 : 14),
+                              topLeft: const Radius.circular(12),
+                              topRight: const Radius.circular(12),
+                              bottomLeft: Radius.circular(isGuest ? 12 : 4),
+                              bottomRight: Radius.circular(isGuest ? 4 : 12),
                             ),
                             border: Border.all(
                               color: isGuest
@@ -302,7 +303,7 @@ class _IncidentChatPanelState extends State<IncidentChatPanel> {
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.zero,
                             backgroundColor: _primary,
-                            foregroundColor: Colors.black,
+                            foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),

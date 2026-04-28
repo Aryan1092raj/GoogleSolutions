@@ -13,12 +13,10 @@ class SOSTriggerButton extends StatefulWidget {
 
 class _SOSTriggerButtonState extends State<SOSTriggerButton>
     with TickerProviderStateMixin {
-  // Three staggered pulse ring controllers
   late AnimationController _pulseController1;
   late AnimationController _pulseController2;
   late AnimationController _pulseController3;
 
-  // Hold activation
   Timer? _holdTimer;
   bool _holding = false;
   double _progress = 0;
@@ -28,7 +26,6 @@ class _SOSTriggerButtonState extends State<SOSTriggerButton>
   void initState() {
     super.initState();
 
-    // Three pulse rings staggered by 400ms
     _pulseController1 = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -44,7 +41,6 @@ class _SOSTriggerButtonState extends State<SOSTriggerButton>
       vsync: this,
     );
 
-    // Stagger the rings
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) _pulseController2.repeat(reverse: false);
     });
@@ -102,8 +98,8 @@ class _SOSTriggerButtonState extends State<SOSTriggerButton>
                   animation: _pulseController3,
                   builder: (context, child) {
                     final pulseValue = _pulseController3.value;
-                    final expandedSize = 280 * (0.7 + 0.3 * pulseValue);
-                    final opacity = 0.04 * (1 - pulseValue);
+                    final expandedSize = 236 * (0.82 + 0.18 * pulseValue);
+                    final opacity = 0.03 * (1 - pulseValue);
                     return Positioned(
                       width: expandedSize,
                       height: expandedSize,
@@ -121,8 +117,8 @@ class _SOSTriggerButtonState extends State<SOSTriggerButton>
                   animation: _pulseController2,
                   builder: (context, child) {
                     final pulseValue = _pulseController2.value;
-                    final expandedSize = 240 * (0.7 + 0.3 * pulseValue);
-                    final opacity = 0.08 * (1 - pulseValue);
+                    final expandedSize = 212 * (0.82 + 0.18 * pulseValue);
+                    final opacity = 0.06 * (1 - pulseValue);
                     return Positioned(
                       width: expandedSize,
                       height: expandedSize,
@@ -140,8 +136,8 @@ class _SOSTriggerButtonState extends State<SOSTriggerButton>
                   animation: _pulseController1,
                   builder: (context, child) {
                     final pulseValue = _pulseController1.value;
-                    final expandedSize = 200 * (0.7 + 0.3 * pulseValue);
-                    final opacity = 0.15 * (1 - pulseValue);
+                    final expandedSize = 188 * (0.84 + 0.16 * pulseValue);
+                    final opacity = 0.10 * (1 - pulseValue);
                     return Positioned(
                       width: expandedSize,
                       height: expandedSize,
@@ -157,43 +153,48 @@ class _SOSTriggerButtonState extends State<SOSTriggerButton>
                 // Progress ring (visible during hold)
                 if (_holding)
                   SizedBox(
-                    width: 180,
-                    height: 180,
+                    width: 164,
+                    height: 164,
                     child: CircularProgressIndicator(
                       value: _progress,
-                      strokeWidth: 4,
+                      strokeWidth: 3,
                       color: kPrimary,
-                      backgroundColor: kPrimary.withValues(alpha: 0.2),
+                      backgroundColor: kPrimary.withValues(alpha: 0.16),
                     ),
                   ),
-                // Main SOS Button - 160px diameter
                 Container(
-                  width: 160,
-                  height: 160,
+                  width: 148,
+                  height: 148,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [kPrimary, Color(0xFFff5545)],
+                    color: kPrimary,
+                    border: Border.all(
+                      color: const Color(0x66FFFFFF),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kPrimary.withValues(alpha: 0.4),
-                        blurRadius: 40,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
                   ),
-                  child: const Center(
-                    child: Text(
-                      'SOS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 3,
-                      ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'SOS',
+                          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 2.4,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'PRESS AND HOLD',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
