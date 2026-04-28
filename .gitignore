@@ -314,3 +314,9 @@ progress.txt
 deployment.txt
 sentry/
 caveman/
+.vscode/
+opencode.json
+model_capabailites.yaml
+index.ts
+.code-review-graph
+.git
