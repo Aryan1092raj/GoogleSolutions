@@ -59,53 +59,58 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Dark background with green tint
-          Container(color: kBackground),
-          // Green glow instead of blue
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Container(
-                width: 400,
-                height: 400,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      kSecondary.withValues(alpha: 0.35),
-                      kSecondary.withValues(alpha: 0.2),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                    radius: 0.6,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Content
-          SafeArea(
+      backgroundColor: kBackground,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
             child: Padding(
-              padding: const EdgeInsets.all(28),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _buildStatusStrip(),
                   const Spacer(),
                   _buildSuccessAnimation(),
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 26),
                   _buildTitle(context),
                   const SizedBox(height: 12),
                   _buildSubtitle(),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
                   _buildIncidentCard(),
                   const Spacer(),
                   _buildReturnButton(context),
-                  const SizedBox(height: 16),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusStrip() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: kPanel,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0x1FFFFFFF),
+          width: 1,
+        ),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified_user_outlined, color: kSecondary, size: 16),
+          SizedBox(width: 8),
+          Text(
+            'Incident status: Resolved',
+            style: TextStyle(
+              color: kTextPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -117,44 +122,22 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
     return ScaleTransition(
       scale: _checkScale,
       child: Container(
-        width: 120,
-        height: 120,
+        width: 108,
+        height: 108,
         margin: const EdgeInsets.only(bottom: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: kSecondary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          color: const Color(0x1A22C55E),
           border: Border.all(
             color: kSecondary,
             width: 2,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: kSecondary.withValues(alpha: 0.3),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-          ],
         ),
-        child: Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                kSecondary,
-                kSecondary.withValues(alpha: 0.8),
-              ],
-            ),
-          ),
-          child: const Icon(
-            Icons.check_rounded,
-            color: Colors.white,
-            size: 50,
-          ),
+        child: const Icon(
+          Icons.check_rounded,
+          color: kSecondary,
+          size: 54,
         ),
       ),
     );
@@ -167,9 +150,8 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
         'Emergency Resolved',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.displayMedium?.copyWith(
-              fontSize: 28,
+              fontSize: 30,
               fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
             ),
       ),
     );
@@ -181,22 +163,22 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
       child: Column(
         children: [
           const Text(
-            'Help has been notified.',
+            'Security acknowledged your SOS and closed this incident.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: kTextPrimary,
-              fontSize: 16,
-              height: 1.5,
+              color: kTextSecondary,
+              fontSize: 15,
+              height: 1.45,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: kSecondary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
+              color: const Color(0x1A22C55E),
+              borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: kSecondary.withValues(alpha: 0.3),
+                color: const Color(0x6622C55E),
               ),
             ),
             child: const Row(
@@ -208,8 +190,9 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
                   'You are safe',
                   style: TextStyle(
                     color: kSecondary,
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ],
@@ -224,8 +207,15 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
     return FadeTransition(
       opacity: _fadeIn,
       child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: glassSurfaceDecoration,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0x1FFFFFFF),
+            width: 1,
+          ),
+        ),
         child: Row(
           children: [
             Container(
@@ -237,39 +227,41 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
               child: const Icon(
                 Icons.confirmation_number_outlined,
                 color: kSecondary,
-                size: 20,
+                size: 18,
               ),
             ),
             const SizedBox(width: 14),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Incident Reference',
-                  style: TextStyle(
-                    color: kTextMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Incident Reference',
+                    style: TextStyle(
+                      color: kTextMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Keep this for your records',
-                  style: TextStyle(
-                    color: kTextMuted,
-                    fontSize: 10,
+                  SizedBox(height: 2),
+                  Text(
+                    'Keep this for your records',
+                    style: TextStyle(
+                      color: kTextMuted,
+                      fontSize: 10,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const Spacer(),
+            const SizedBox(width: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0x0DFFFFFF),
+                color: kPanel,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: const Color(0x1AFFFFFF),
+                  color: const Color(0x1FFFFFFF),
                 ),
               ),
               child: Text(
@@ -279,7 +271,7 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
                 style: const TextStyle(
                   color: kTextPrimary,
                   fontSize: 12,
-                  fontFamily: 'monospace',
+                  fontFamily: 'RobotoMono',
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -293,47 +285,29 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
   Widget _buildReturnButton(BuildContext context) {
     return FadeTransition(
       opacity: _fadeIn,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: kSecondary.withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-            const BoxShadow(
-              color: Color(0x59FFFFFF),
-              blurRadius: 4,
-              offset: Offset(0, 4),
-              spreadRadius: -4,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: kBrandBlue,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        onPressed: () => context.go('/home'),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.home_outlined, size: 20),
+            SizedBox(width: 10),
+            Text(
+              'Return to Home',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
-        ),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kSecondary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          onPressed: () => context.go('/home'),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.home_outlined, size: 20),
-              SizedBox(width: 10),
-              Text(
-                'Return to Home',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

@@ -42,27 +42,18 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
     final lang = profile?.language ?? 'en';
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Dark background
-          Container(color: kBackground),
-          // Background glow
-          buildBackgroundGlow(alignment: Alignment.topLeft),
-          // Content
-          SafeArea(
-            child: Column(
-              children: [
-                // Pending SOS banner
-                if (_hasPendingSOS) _buildPendingBanner(ref),
-                _buildContextBar(context, hotel, room),
-                Expanded(
-                  child: _buildMainContent(context, ref, sosState),
-                ),
-                _buildLanguagePill(lang),
-              ],
+      backgroundColor: kBackground,
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (_hasPendingSOS) _buildPendingBanner(ref),
+            _buildContextBar(context, hotel, room),
+            Expanded(
+              child: _buildMainContent(context, ref, sosState),
             ),
-          ),
-        ],
+            _buildLanguagePill(lang),
+          ],
+        ),
       ),
     );
   }
@@ -72,11 +63,11 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0x26F59E0B),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: Colors.amber.withValues(alpha: 0.5),
-          width: 1.5,
+          color: const Color(0x66F59E0B),
+          width: 1,
         ),
       ),
       child: Row(
@@ -118,14 +109,13 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // Retry button
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: const Color(0xFF111111),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
             onPressed: () async {
@@ -162,32 +152,35 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: glassSurfaceDecoration,
+      decoration: BoxDecoration(
+        color: kPanel,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0x1FFFFFFF),
+          width: 1,
+        ),
+      ),
       child: Row(
         children: [
-          // Shield icon
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [kPrimary, Color(0xFFff5545)],
-              ),
-              borderRadius: BorderRadius.circular(10),
+              color: kPrimary,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
-              Icons.shield,
+              Icons.sos_outlined,
               color: Colors.white,
               size: 18,
             ),
           ),
           const SizedBox(width: 12),
-          // Hotel & Room info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hotel,
+                  'Hotel $hotel',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: kTextPrimary,
                         fontWeight: FontWeight.w600,
@@ -206,7 +199,6 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
               ],
             ),
           ),
-          // Connection badge
           _buildConnectionBadge(),
         ],
       ),
@@ -217,10 +209,10 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: kSecondary.withValues(alpha: 0.15),
+        color: const Color(0x1A22C55E),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: kSecondary.withValues(alpha: 0.3),
+          color: const Color(0x6622C55E),
           width: 1,
         ),
       ),
@@ -244,133 +236,138 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
 
   Widget _buildMainContent(
       BuildContext context, WidgetRef ref, SOSState sosState) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Hero icon with glow
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.85, end: 1.0),
-            duration: const Duration(milliseconds: 1200),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              return Transform.scale(scale: value, child: child);
-            },
-            child: Container(
-              width: 118,
-              height: 118,
-              margin: const EdgeInsets.only(bottom: 28),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [kPrimary, Color(0xFFFF6B5B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(34),
-                boxShadow: [
-                  BoxShadow(
-                    color: kPrimary.withValues(alpha: 0.34),
-                    blurRadius: 40,
-                    spreadRadius: 3,
-                  ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildEmergencyPanel(context),
+              const SizedBox(height: 16),
+              const Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _HomeSignal(
+                      label: 'Live video relay', icon: Icons.videocam_outlined),
+                  _HomeSignal(
+                      label: 'Location context',
+                      icon: Icons.location_on_outlined),
+                  _HomeSignal(
+                      label: 'Rescue channel', icon: Icons.forum_outlined),
                 ],
               ),
-              child: const Icon(
-                Icons.sos_rounded,
-                color: Colors.white,
-                size: 56,
+              const SizedBox(height: 30),
+              SOSTriggerButton(
+                onPressed: () async {
+                  await ref.read(sosProvider.notifier).triggerSOS();
+                  final state = ref.read(sosProvider);
+                  if (!context.mounted) return;
+                  if (state.status == SOSStatus.error) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(state.error ?? 'Failed'),
+                        backgroundColor: kPrimary,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  context.go('/sos/active/${state.incidentId}');
+                },
               ),
-            ),
-          ),
-          // Headline
-          Text(
-            'One hold. Live relay. Help moving.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w700,
-                  height: 1.15,
-                ),
-          ),
-          const SizedBox(height: 12),
-          // Instruction text
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 320),
-            child: Text(
-              'If you are in danger, press and hold. Your room, camera feed, and live updates go straight to the security desk.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    height: 1.65,
-                    fontSize: 15,
-                  ),
-            ),
-          ),
-          const SizedBox(height: 28),
-          // Feature pills
-          const Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _HomeSignal(
-                  label: 'Live video relay', icon: Icons.videocam_outlined),
-              _HomeSignal(
-                  label: 'Location context', icon: Icons.location_on_outlined),
-              _HomeSignal(label: 'Rescue channel', icon: Icons.forum_outlined),
+              const SizedBox(height: 24),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: sosState.status == SOSStatus.initiating
+                    ? _buildConnectingIndicator()
+                    : _buildStandbyNotice(context),
+              ),
             ],
           ),
-          const SizedBox(height: 42),
-          // SOS Trigger Button
-          SOSTriggerButton(
-            onPressed: () async {
-              await ref.read(sosProvider.notifier).triggerSOS();
-              final state = ref.read(sosProvider);
-              if (!context.mounted) return;
-              if (state.status == SOSStatus.error) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(state.error ?? 'Failed'),
-                    backgroundColor: kPrimary,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                );
-                return;
-              }
-              context.go('/sos/active/${state.incidentId}');
-            },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmergencyPanel(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0x1FFFFFFF),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'EMERGENCY',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  letterSpacing: 0.9,
+                ),
           ),
-          const SizedBox(height: 28),
-          // Reassurance pill
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: sosState.status == SOSStatus.initiating
-                ? _buildConnectingIndicator()
-                : Container(
-                    key: const ValueKey('reassurance'),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: glassSurfaceDecoration,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.shield_moon_outlined,
-                            color: kSecondary, size: 16),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Stay calm. The emergency desk is on standby.',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: kTextPrimary,
-                                    fontSize: 13,
-                                  ),
-                        ),
-                      ],
-                    ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: kPrimary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.sos_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Emergency Relay Console',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0x22EF4444),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0x66EF4444)),
+                ),
+                child: const Text(
+                  'ARMED',
+                  style: TextStyle(
+                    color: kPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.7,
                   ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Press and hold SOS if you are in danger. Room context, live media, and updates route to the security desk immediately.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: kTextSecondary,
+                  height: 1.45,
+                ),
           ),
         ],
       ),
@@ -378,32 +375,67 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
   }
 
   Widget _buildConnectingIndicator() {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 1000),
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: child,
-        );
-      },
-      child: const Column(
+    return Container(
+      key: const ValueKey('connecting'),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0x1FFFFFFF),
+          width: 1,
+        ),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.max,
         children: [
           SizedBox(
-            width: 32,
-            height: 32,
+            width: 18,
+            height: 18,
             child: CircularProgressIndicator(
               color: kPrimary,
-              strokeWidth: 3,
+              strokeWidth: 2,
             ),
           ),
-          SizedBox(height: 16),
+          SizedBox(width: 10),
           Text(
             'Connecting to emergency services...',
             style: TextStyle(
-              color: kTextMuted,
+              color: kTextPrimary,
               fontSize: 13,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStandbyNotice(BuildContext context) {
+    return Container(
+      key: const ValueKey('standby'),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0x1FFFFFFF),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        children: [
+          const Icon(Icons.shield_moon_outlined, color: kSecondary, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Stay calm. The emergency desk is on standby.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: kTextPrimary,
+                    fontSize: 13,
+                  ),
             ),
           ),
         ],
@@ -416,7 +448,14 @@ class _SOSHomeScreenState extends ConsumerState<SOSHomeScreen> {
       padding: const EdgeInsets.only(bottom: 32),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: glassSurfaceDecoration,
+        decoration: BoxDecoration(
+          color: kPanel,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: const Color(0x1FFFFFFF),
+            width: 1,
+          ),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -448,7 +487,14 @@ class _HomeSignal extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: glassSurfaceDecoration,
+      decoration: BoxDecoration(
+        color: kPanel,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: const Color(0x1FFFFFFF),
+          width: 1,
+        ),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

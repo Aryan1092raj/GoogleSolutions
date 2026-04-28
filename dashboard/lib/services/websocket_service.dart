@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../core/constants.dart';
+
 class MediaChunk {
   final String incidentId;
   final int chunkIndex;
@@ -51,10 +53,23 @@ class DashboardWebSocketService {
     }
 
     final idToken = await user.getIdToken();
-    final wsUrl = 'ws://localhost:8080/ws/dashboard?token=$idToken&incidentId=$incidentId';
+    final backendBase = DashboardConstants.backendBaseUrl;
+    if (backendBase.isEmpty) {
+      return;
+    }
+    final backendUri = Uri.parse(backendBase);
+    final wsScheme = backendUri.scheme == 'https' ? 'wss' : 'ws';
+    final wsUri = backendUri.replace(
+      scheme: wsScheme,
+      path: '/ws/dashboard',
+      queryParameters: {
+        'token': idToken,
+        'incidentId': incidentId,
+      },
+    );
 
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _channel = WebSocketChannel.connect(wsUri);
       _channel!.stream.listen(
         (data) {
           try {

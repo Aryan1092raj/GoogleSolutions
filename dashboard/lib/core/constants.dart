@@ -7,15 +7,17 @@ class DashboardConstants {
       return configured;
     }
 
-    if (kIsWeb) {
-      final host = Uri.base.host;
-      if (host == 'localhost' || host == '127.0.0.1') {
-        return 'http://localhost:8080';
-      }
+    final base = Uri.base;
+    final host = base.host;
+
+    if (host == 'localhost' || host == '127.0.0.1') {
+      return 'http://localhost:8080';
     }
 
-    return 'https://resqlink-backend-xxxx-uc.a.run.app';
-  }
+    if (kIsWeb) {
+      return '${base.scheme}://${base.authority}';
+    }
 
-  static const String firebaseRtdbUrl = 'https://resqlink-prod-default-rtdb.firebaseio.com';
+    return '';
+  }
 }

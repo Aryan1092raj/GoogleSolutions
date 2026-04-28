@@ -7,7 +7,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/theme.dart';
 import '../../../core/constants.dart';
-import '../../../core/widgets/interactive_background.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/widgets/language_picker.dart';
 import '../../auth/screens/scan_qr_screen.dart';
@@ -73,36 +72,47 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      hintStyle: TextStyle(color: kTextMuted.withValues(alpha: 0.5)),
+      hintStyle: TextStyle(color: kTextMuted.withValues(alpha: 0.75)),
       labelStyle: const TextStyle(color: kTextMuted),
       prefixIcon: Icon(icon, color: kTextMuted, size: 20),
       filled: true,
-      fillColor: const Color(0x0FFFFFFF),
+      fillColor: kPanel,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(
-          color: Color(0x33FFFFFF),
+          color: Color(0x1FFFFFFF),
           width: 1,
         ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kSecondary, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: kBrandBlue, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: kPrimary, width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kPrimary, width: 2),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: kPrimary, width: 1.5),
       ),
       errorStyle: const TextStyle(color: kPrimary, fontSize: 12),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    );
+  }
+
+  BoxDecoration _panelDecoration() {
+    return BoxDecoration(
+      color: kSurface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: const Color(0x1FFFFFFF),
+        width: 1,
+      ),
     );
   }
 
@@ -222,39 +232,34 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return InteractiveBackground(
-      child: Scaffold(
-        body: Stack(
-          children: [
-            // Dark background
-            Container(color: kBackground),
-            // Background glow in top-left
-            buildBackgroundGlow(alignment: Alignment.topLeft),
-            // Content
-            SafeArea(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 48),
-                        _buildForm(),
-                        const SizedBox(height: 40),
-                        _buildCTA(),
-                        const SizedBox(height: 24),
-                        _buildFooter(),
-                      ],
-                    ),
+    return Scaffold(
+      backgroundColor: kBackground,
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 22),
+                      _buildForm(),
+                      const SizedBox(height: 18),
+                      _buildCTA(),
+                      const SizedBox(height: 14),
+                      _buildFooter(),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -262,49 +267,40 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   Widget _buildHeader() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Shield logo with gradient
         Container(
-          width: 72,
-          height: 72,
-          margin: const EdgeInsets.only(bottom: 20),
+          width: 56,
+          height: 56,
+          margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [kPrimary, Color(0xFFff5545)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: kPrimary.withValues(alpha: 0.4),
-                blurRadius: 40,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            color: kBrandBlue,
+            borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(
             Icons.shield,
             color: Colors.white,
-            size: 36,
+            size: 28,
           ),
         ),
-        // ResQLink headline
         Text(
-          'ResQLink',
-          style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
+          'RESQLINK',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: kBrandBlue,
+                letterSpacing: 1.2,
               ),
         ),
         const SizedBox(height: 8),
-        // Subline
         Text(
-          'Your emergency safety companion',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 14,
+          'Guest Check-In',
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Join the emergency relay system before you proceed.',
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
     );
@@ -313,28 +309,26 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   Widget _buildForm() {
     return Column(
       children: [
-        // Hotel Code & Room Number Card
         Container(
           padding: const EdgeInsets.all(20),
-          decoration: glassSurfaceDecoration,
+          decoration: _panelDecoration(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Check In',
+                'Property Details',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: kTextPrimary,
-                      fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                'Enter your hotel details to get started',
-                style: Theme.of(context).textTheme.bodySmall,
+                'Scan your room QR or enter details manually.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.45,
+                    ),
               ),
               const SizedBox(height: 16),
-              // Scan QR Code button
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -343,24 +337,34 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   label: const Text('Scan QR Code'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: kTextPrimary,
-                    side: const BorderSide(color: kSecondary, width: 1.5),
+                    side: const BorderSide(color: Color(0x33FFFFFF), width: 1),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                '— OR —',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: kTextMuted,
-                      fontSize: 12,
+              const SizedBox(height: 14),
+              const Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'MANUAL ENTRY',
+                      style: TextStyle(
+                        color: kTextMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
                     ),
-                textAlign: TextAlign.center,
+                  ),
+                  Expanded(child: Divider()),
+                ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _hotelIdCtrl,
                 style: const TextStyle(color: kTextPrimary),
@@ -374,7 +378,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               DropdownButtonFormField<String>(
                 initialValue: _roomType,
                 decoration: _field('Room Type', Icons.category_outlined),
-                dropdownColor: kSurface,
+                dropdownColor: kPanel,
+                iconEnabledColor: kTextMuted,
                 style: const TextStyle(color: kTextPrimary),
                 items: _kRoomTypes
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
@@ -398,25 +403,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
           ),
         ),
         const SizedBox(height: 20),
-        // Language Picker Card
         Container(
           padding: const EdgeInsets.all(20),
-          decoration: glassSurfaceDecoration,
+          decoration: _panelDecoration(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Language',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: kTextPrimary,
-                      fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 'Select your preferred language for emergency communications',
-                style: Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.45,
+                    ),
               ),
               const SizedBox(height: 16),
               LanguagePicker(
@@ -431,80 +435,54 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   }
 
   Widget _buildCTA() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: _loading
-            ? null
-            : [
-                BoxShadow(
-                  color: kBrandBlue.withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-                const BoxShadow(
-                  color: Color(0x59FFFFFF),
-                  blurRadius: 4,
-                  offset: Offset(0, 4),
-                  spreadRadius: -4,
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: kBrandBlue,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        elevation: 0,
+      ),
+      onPressed: _loading ? null : _submit,
+      child: _loading
+          ? const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2.2,
+              ),
+            )
+          : const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.login_rounded, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Activate Guest Session',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
-      ),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: kBrandBlue.withValues(alpha: 0.8),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 0,
-        ),
-        onPressed: _loading ? null : _submit,
-        child: _loading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
-              )
-            : const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.arrow_forward_rounded, size: 22),
-                  SizedBox(width: 10),
-                  Text(
-                    'Get Started',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-      ),
+            ),
     );
   }
 
   Widget _buildFooter() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0x0DFFFFFF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0x33FFFFFF),
-        ),
-      ),
+      padding: const EdgeInsets.all(14),
+      decoration: _panelDecoration(),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: kSecondary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
+              color: const Color(0x1A22C55E),
+              borderRadius: BorderRadius.circular(7),
             ),
             child: const Icon(
               Icons.location_on_outlined,
@@ -518,7 +496,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               'Your location is only shared during an active emergency.',
               style: TextStyle(
                 color: kTextMuted,
-                fontSize: 12,
+                fontSize: 11,
                 height: 1.4,
               ),
             ),
