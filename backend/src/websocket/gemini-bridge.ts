@@ -10,6 +10,8 @@ type BridgeSession = {
   mode: 'GENAI_LIVE' | 'VERTEX_CHAT' | 'GEMINI_API';
 };
 
+type GeminiSessionMode = BridgeSession['mode'];
+
 const geminiSessions = new Map<string, BridgeSession>();
 const aiFailureRecorded = new Set<string>();
 
@@ -85,6 +87,25 @@ export function registerGuestSender(sender: (incidentId: string, message: unknow
 
 export function buildSystemPrompt(lang: string): string {
   return `${productionPrompt}\n\nSESSION CONTEXT:\n- Guest declared language (ISO 639-1): ${lang}`;
+}
+
+export function resolveGeminiSessionMode(
+  env: Record<string, string | undefined> = process.env,
+): GeminiSessionMode | null {
+  const model = (env.GEMINI_MODEL || '').trim();
+  const apiKey = (env.GEMINI_API_KEY || '').trim();
+  const project = (env.GOOGLE_CLOUD_PROJECT || '').trim();
+  const location = (env.GOOGLE_CLOUD_LOCATION || env.VERTEX_AI_LOCATION || '').trim();
+
+  if (apiKey.length > 0 && model.length > 0) {
+    return 'GEMINI_API';
+  }
+
+  if (project.length > 0 && location.length > 0 && model.length > 0) {
+    return 'VERTEX_CHAT';
+  }
+
+  return null;
 }
 
 function buildAiUnavailableSummary(error: unknown): string {
@@ -385,7 +406,19 @@ export async function openGeminiSession(incidentId: string, guestLanguage: strin
   closeGeminiSession(incidentId);
 
   try {
-    const session = await createGenAiLiveSession(incidentId, guestLanguage);
+    const mode = resolveGeminiSessionMode();
+    let session: BridgeSession;
+
+    if (mode === 'GEMINI_API') {
+      session = await createGenAiLiveSession(incidentId, guestLanguage);
+    } else if (mode === 'VERTEX_CHAT') {
+      session = await createVertexChatFallbackSession(incidentId, guestLanguage);
+    } else {
+      throw new Error(
+        'Gemini is not configured. Set GEMINI_API_KEY + GEMINI_MODEL, or GOOGLE_CLOUD_PROJECT + GOOGLE_CLOUD_LOCATION/VERTEX_AI_LOCATION + GEMINI_MODEL.',
+      );
+    }
+
     geminiSessions.set(incidentId, session);
     logger.info('Gemini session opened', { incidentId, mode: session.mode });
     return session;

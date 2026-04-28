@@ -1,17 +1,22 @@
-# resqlink_dashboard
+# ResQLink Dashboard
 
-A new Flutter project.
+## Local setup
 
-## Getting Started
+Generate the gitignored Firebase config before running:
 
-This project is a starting point for a Flutter application.
+```powershell
+flutterfire configure --project=solution-e2a1c --platforms=web --out=lib/firebase_options.dart --yes
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Google Maps build
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+The committed `web/index.html` keeps a placeholder key on purpose. Do not hardcode a real Maps key in git.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```powershell
+copy .env.example .env.local
+# set GOOGLE_MAPS_API_KEY in .env.local
+scripts\run-with-maps.bat edge
+scripts\build-with-maps.bat
+```
+
+The helper scripts inject the key into `web/index.html`, run Flutter, then restore the placeholder so the repo stays clean.

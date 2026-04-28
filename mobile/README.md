@@ -1,17 +1,11 @@
-# resqlink_mobile
+# ResQLink Mobile
 
-A new Flutter project.
+## Local setup
 
-## Getting Started
+Generate the gitignored Firebase config before running:
 
-This project is a starting point for a Flutter application.
+```powershell
+flutterfire configure --project=solution-e2a1c --platforms=android,ios --out=lib/firebase_options.dart --yes
+```
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+`lib/firebase_options.dart` is not committed on purpose. The app imports that file at startup, so local generation is required before `flutter run`, `flutter analyze`, or release builds.
