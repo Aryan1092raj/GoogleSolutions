@@ -54,12 +54,12 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
       subtitle: 'Search incidents, rooms, responders',
       activeCount: cards.length,
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: 360,
+              width: 368,
               child: _IncidentColumn(
                 cards: filteredCards,
                 totalCards: cards,
@@ -72,10 +72,11 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
                 onQueryChanged: (value) => setState(() => _query = value),
                 onSeverityFilterChanged: (value) =>
                     setState(() => _severityFilter = value),
-                onSelect: (incidentId) => setState(() => _selectedId = incidentId),
+                onSelect: (incidentId) =>
+                    setState(() => _selectedId = incidentId),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 20),
             Expanded(
               child: selected == null
                   ? const DashboardPanel(
@@ -88,9 +89,9 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
                     )
                   : _WorkspaceColumn(card: selected),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 20),
             SizedBox(
-              width: 392,
+              width: 400,
               child: selected == null
                   ? const DashboardPanel(
                       child: DashboardEmptyState(
@@ -192,10 +193,10 @@ class _IncidentColumn extends StatelessWidget {
           averageAge: averageAge,
         ),
         if (criticalCount > 0) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _CriticalBanner(criticalCount: criticalCount),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Expanded(
           child: DashboardPanel(
             child: Column(
@@ -205,11 +206,12 @@ class _IncidentColumn extends StatelessWidget {
                   'Active Incidents',
                   style: GoogleFonts.inter(
                     color: kDashText,
-                    fontSize: 20,
+                    fontSize: 22,
+                    height: 1.15,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 TextField(
                   onChanged: onQueryChanged,
                   decoration: const InputDecoration(
@@ -217,12 +219,12 @@ class _IncidentColumn extends StatelessWidget {
                     prefixIcon: Icon(Icons.search, size: 16),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 _FilterChips(
                   value: severityFilter,
                   onChanged: onSeverityFilterChanged,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Expanded(
                   child: cards.isEmpty
                       ? const DashboardEmptyState(
@@ -279,8 +281,7 @@ class _FilterChips extends StatelessWidget {
                   color: value == label ? kDashSurfaceActive : kDashPanel,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color:
-                        value == label ? kDashBorderEmphasis : kDashBorder,
+                    color: value == label ? kDashBorderEmphasis : kDashBorder,
                   ),
                 ),
                 child: Text(
@@ -320,7 +321,8 @@ class _StatsBar extends StatelessWidget {
       child: Row(
         children: [
           _StatCell(label: 'ACTIVE', value: '$activeCount'),
-          _StatCell(label: 'CRITICAL', value: '$criticalCount', color: kDashDanger),
+          _StatCell(
+              label: 'CRITICAL', value: '$criticalCount', color: kDashDanger),
           _StatCell(label: 'HIGH', value: '$highCount', color: kDashWarning),
           _StatCell(label: 'RESPONSE AGE', value: averageAge),
         ],
@@ -436,80 +438,80 @@ class _IncidentCardTile extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(12),
         child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 3,
-                height: 72,
-                color: color,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            card.incidentId,
-                            overflow: TextOverflow.ellipsis,
-                            style: dashboardMonoTextStyle(
-                              color: kDashTextMut,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          _relativeAge(card.lastUpdatedMs),
-                          style: GoogleFonts.inter(
-                            color: kDashTextDim,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 3,
+              height: 72,
+              color: color,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          card.incidentId,
+                          overflow: TextOverflow.ellipsis,
+                          style: dashboardMonoTextStyle(
+                            color: kDashTextMut,
                             fontSize: 11,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${card.primaryHazard.replaceAll('_', ' ')} - Room ${card.roomNumber}',
-                      style: GoogleFonts.inter(
-                        color: kDashText,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Floor ${card.floor} - ${card.guestName}',
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        color: kDashTextSub,
-                        fontSize: 12,
+                      Text(
+                        _relativeAge(card.lastUpdatedMs),
+                        style: GoogleFonts.inter(
+                          color: kDashTextDim,
+                          fontSize: 11,
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${card.primaryHazard.replaceAll('_', ' ')} - Room ${card.roomNumber}',
+                    style: GoogleFonts.inter(
+                      color: kDashText,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _SeverityBadge(label: severity, color: color),
-                        const SizedBox(width: 8),
-                        if (card.isStreamLive)
-                          Text(
-                            'LIVE FEED',
-                            style: GoogleFonts.inter(
-                              color: kDashDanger,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Floor ${card.floor} - ${card.guestName}',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: kDashTextSub,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _SeverityBadge(label: severity, color: color),
+                      const SizedBox(width: 8),
+                      if (card.isStreamLive)
+                        Text(
+                          'LIVE FEED',
+                          style: GoogleFonts.inter(
+                            color: kDashDanger,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
                           ),
-                      ],
-                    ),
-                  ],
-                ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
       ),
     );
   }

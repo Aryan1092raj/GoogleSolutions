@@ -5,7 +5,7 @@ import * as storageService from '../services/storage.service';
 import { getRtdb } from '../config/firebase-admin';
 import { logger } from '../utils/logger';
 import { closeGeminiSession, openGeminiSession, sendMediaToGemini } from './gemini-bridge';
-import { sendToGuest } from './ws-server';
+import { broadcastToDashboards, sendToGuest } from './ws-server';
 import { startEscalationTimer, cancelEscalationTimer } from '../services/escalation.service';
  
 const maxChunkBytes = Number(process.env.MAX_MEDIA_CHUNK_BYTES ? process.env.MAX_MEDIA_CHUNK_BYTES : '524288'); 
@@ -118,6 +118,22 @@ export async function handleSosMessage(ws, rawMessage, incidentIdFromConnection)
  
     await sendMediaToGemini(msg.payload.incidentId, msg.payload);
     await storageService.appendMediaChunk(msg.payload.incidentId, msg.payload.chunkIndex, msg.payload.video, msg.payload.audio);
+
+    // Mirror incoming media chunks to staff dashboard websocket clients.
+    if (msg.payload.video || msg.payload.audio) {
+      broadcastToDashboards(msg.payload.incidentId, {
+        type: 'MEDIA_CHUNK',
+        payload: {
+          incidentId: msg.payload.incidentId,
+          chunkIndex: msg.payload.chunkIndex,
+          timestampMs: msg.payload.timestampMs,
+          video: msg.payload.video,
+          audio: msg.payload.audio,
+          mimeTypeVideo: msg.payload.mimeTypeVideo,
+          mimeTypeAudio: msg.payload.mimeTypeAudio,
+        },
+      });
+    }
 
     // Relay latest frame to RTDB so dashboard can display it (every 2 chunks = ~3fps at 6fps capture)
     if (msg.payload.video && msg.payload.chunkIndex % 2 === 0) {

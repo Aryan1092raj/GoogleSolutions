@@ -60,7 +60,7 @@ class _IncidentHistoryScreenState extends ConsumerState<IncidentHistoryScreen> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                     child: historyAsync.when(
                       data: (records) {
                         final filtered = _filteredRecords(records);
@@ -80,17 +80,17 @@ class _IncidentHistoryScreenState extends ConsumerState<IncidentHistoryScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildTopHeader(filtered),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 16),
                             if (highlightRecord != null) ...[
                               _ResolvedHighlightCard(
                                 record: highlightRecord,
                                 onOpen: () => context.go(
                                     '/incident/${highlightRecord.incidentId}'),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 16),
                             ],
                             _buildFilterRow(filtered),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 16),
                             Expanded(
                               child: Container(
                                 decoration: glassSurfaceDecoration,
@@ -149,7 +149,7 @@ class _IncidentHistoryScreenState extends ConsumerState<IncidentHistoryScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 16),
                             _StatsRow(stats: stats),
                           ],
                         );

@@ -45,11 +45,11 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
       subtitle: 'Room-level location tracking',
       activeCount: cards.length,
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
         child: Row(
           children: [
             SizedBox(
-              width: 320,
+              width: 336,
               child: DashboardPanel(
                 child: cards.isEmpty
                     ? const DashboardEmptyState(
@@ -58,51 +58,72 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                             'Live location overlays appear here when incidents carry room or GPS context.',
                         icon: Icons.map_outlined,
                       )
-                    : ListView.separated(
-                        itemCount: cards.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final card = cards[index];
-                          final selectedCard = card.incidentId == _selectedId;
-                          return InkWell(
-                            onTap: () => setState(() => _selectedId = card.incidentId),
-                            child: Container(
-                              decoration: dashboardPanelDecoration(
-                                selected: selectedCard,
-                                border: selectedCard
-                                    ? severityColor(card.severity)
-                                        .withValues(alpha: 0.35)
-                                    : kDashBorder,
-                              ),
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Room ${card.roomNumber}',
-                                    style: GoogleFonts.inter(
-                                      color: kDashText,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${card.guestName} · ${card.primaryHazard}',
-                                    style: GoogleFonts.inter(
-                                      color: kDashTextSub,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Active Rooms',
+                            style: GoogleFonts.inter(
+                              color: kDashText,
+                              fontSize: 20,
+                              height: 1.15,
+                              fontWeight: FontWeight.w600,
                             ),
-                          );
-                        },
+                          ),
+                          const SizedBox(height: 14),
+                          Expanded(
+                            child: ListView.separated(
+                              itemCount: cards.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, index) {
+                                final card = cards[index];
+                                final selectedCard =
+                                    card.incidentId == _selectedId;
+                                return InkWell(
+                                  onTap: () => setState(
+                                      () => _selectedId = card.incidentId),
+                                  child: Container(
+                                    decoration: dashboardPanelDecoration(
+                                      selected: selectedCard,
+                                      border: selectedCard
+                                          ? severityColor(card.severity)
+                                              .withValues(alpha: 0.35)
+                                          : kDashBorder,
+                                    ),
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Room ${card.roomNumber}',
+                                          style: GoogleFonts.inter(
+                                            color: kDashText,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${card.guestName} · ${card.primaryHazard}',
+                                          style: GoogleFonts.inter(
+                                            color: kDashTextSub,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 20),
             Expanded(
               child: selected == null
                   ? const DashboardPanel(
@@ -115,9 +136,9 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                     )
                   : _SelectedIncidentMap(card: selected),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 20),
             SizedBox(
-              width: 360,
+              width: 376,
               child: selected == null
                   ? const DashboardPanel(
                       child: DashboardEmptyState(
@@ -161,11 +182,12 @@ class _SelectedIncidentMap extends StatelessWidget {
                 'Floor ${card.floor} · Room ${card.roomNumber}',
                 style: GoogleFonts.inter(
                   color: kDashText,
-                  fontSize: 16,
+                  fontSize: 18,
+                  height: 1.15,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Expanded(
                 child: IncidentMapWidget(
                   lat: lat,

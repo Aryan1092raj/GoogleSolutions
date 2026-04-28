@@ -15,6 +15,8 @@ class VideoMonitorScreen extends ConsumerWidget {
     final cards = ref.watch(incidentListProvider).value ?? const [];
     final profile = ref.watch(staffProfileProvider);
     final liveCards = cards.where((card) => card.isStreamLive).toList();
+    final displayCards = liveCards.isNotEmpty ? liveCards : cards;
+    final showingAwaitingStreams = liveCards.isEmpty && cards.isNotEmpty;
 
     return DashboardShell(
       hotelLabel:
@@ -24,9 +26,9 @@ class VideoMonitorScreen extends ConsumerWidget {
       subtitle: 'Multi-room live feed monitor',
       activeCount: cards.length,
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
         child: DashboardPanel(
-          child: liveCards.isEmpty
+          child: cards.isEmpty
               ? const DashboardEmptyState(
                   title: 'No live streams available',
                   subtitle:
@@ -36,51 +38,80 @@ class VideoMonitorScreen extends ConsumerWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Live Relay Grid',
-                      style: GoogleFonts.inter(
-                        color: kDashText,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Live Relay Grid',
+                            style: GoogleFonts.inter(
+                              color: kDashText,
+                              fontSize: 22,
+                              height: 1.15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          showingAwaitingStreams
+                              ? '${displayCards.length} awaiting feed'
+                              : '${liveCards.length} live',
+                          style: GoogleFonts.inter(
+                            color: kDashTextSub,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     Expanded(
                       child: GridView.builder(
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 18,
+                          mainAxisSpacing: 18,
                           childAspectRatio: 1.15,
                         ),
-                        itemCount: liveCards.length,
+                        itemCount: displayCards.length,
                         itemBuilder: (context, index) {
-                          final card = liveCards[index];
+                          final card = displayCards[index];
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.only(bottom: 10),
                                 child: Row(
                                   children: [
                                     Text(
                                       'Room ${card.roomNumber}',
                                       style: GoogleFonts.inter(
                                         color: kDashText,
-                                        fontSize: 14,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                     const Spacer(),
-                                    Text(
-                                      card.severity,
-                                      style: GoogleFonts.inter(
-                                        color: severityColor(card.severity),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
+                                    if (showingAwaitingStreams)
+                                      Text(
+                                        'AWAITING STREAM',
+                                        style: GoogleFonts.inter(
+                                          color: kDashWarning,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      )
+                                    else
+                                      Text(
+                                        card.severity,
+                                        style: GoogleFonts.inter(
+                                          color: severityColor(card.severity),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ),
