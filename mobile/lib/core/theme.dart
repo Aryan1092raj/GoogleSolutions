@@ -6,6 +6,9 @@ const kSurface = Color(0xFF141516);
 const kSurfaceHigh = Color(0xFF191A1B);
 const kSurfaceActive = Color(0xFF252628);
 const kPanel = Color(0xFF0F1011);
+const kBorderSubtle = Color(0x0DFFFFFF);
+const kBorder = Color(0x14FFFFFF);
+const kBorderEmphasis = Color(0x1FFFFFFF);
 
 const kPrimary = Color(0xFFEF4444);
 const kSecondary = Color(0xFF22C55E);
@@ -20,7 +23,7 @@ BoxDecoration glassSurfaceDecoration = BoxDecoration(
   color: kSurface,
   borderRadius: BorderRadius.circular(8),
   border: Border.all(
-    color: const Color(0x14FFFFFF),
+    color: kBorder,
     width: 1,
   ),
 );
@@ -29,7 +32,7 @@ BoxDecoration glassSurfaceBlurredDecoration = BoxDecoration(
   color: kSurfaceHigh,
   borderRadius: BorderRadius.circular(8),
   border: Border.all(
-    color: const Color(0x14FFFFFF),
+    color: kBorder,
     width: 1,
   ),
 );
@@ -171,7 +174,7 @@ ThemeData buildAppTheme() {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: const BorderSide(
-          color: Color(0x14FFFFFF),
+          color: kBorder,
           width: 1,
         ),
       ),
@@ -199,7 +202,7 @@ ThemeData buildAppTheme() {
           borderRadius: BorderRadius.circular(10),
         ),
         side: const BorderSide(
-          color: Color(0x1FFFFFFF),
+          color: kBorderEmphasis,
           width: 1,
         ),
         textStyle: GoogleFonts.inter(
@@ -229,7 +232,7 @@ ThemeData buildAppTheme() {
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(
-          color: Color(0x1FFFFFFF),
+          color: kBorderEmphasis,
           width: 1,
         ),
       ),
@@ -301,7 +304,7 @@ ThemeData buildAppTheme() {
       ),
     ),
     dividerTheme: const DividerThemeData(
-      color: Color(0x14FFFFFF),
+      color: kBorderSubtle,
       thickness: 1,
     ),
     iconTheme: const IconThemeData(
@@ -323,7 +326,7 @@ ThemeData buildAppTheme() {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: const BorderSide(
-          color: Color(0x14FFFFFF),
+          color: kBorder,
           width: 1,
         ),
       ),

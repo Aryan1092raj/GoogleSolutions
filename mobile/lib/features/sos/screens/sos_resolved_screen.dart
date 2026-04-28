@@ -287,11 +287,14 @@ class _SOSResolvedScreenState extends State<SOSResolvedScreen>
       opacity: _fadeIn,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: kBrandBlue,
+          backgroundColor: kPanel,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(
+              color: Color(0x1FFFFFFF),
+            ),
           ),
         ),
         onPressed: () => context.go('/home'),

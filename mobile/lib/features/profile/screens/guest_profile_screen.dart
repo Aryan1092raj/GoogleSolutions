@@ -155,8 +155,11 @@ class GuestProfileScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
-              color: const Color(0x1A3B82F6),
+              color: kPanel,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0x1FFFFFFF),
+              ),
             ),
             child: Icon(
               icon,
